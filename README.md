@@ -25,7 +25,7 @@ html2md is a C++ single header solution for HTML to Markdown conversion.
 
 //...
 
-std::cout << html2md::Html2Text(html);
+std::cout << html2md::Convert(html);
 ````
 
 See the included example.cpp 

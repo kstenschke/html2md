@@ -17,7 +17,7 @@ int main() {
   pclose(fp);
 
   // Output conversion result
-  std::cout << html2md::Html2Text(html);
+  std::cout << html2md::Convert(html);
 
   return 0;
 }
