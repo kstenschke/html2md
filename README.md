@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/kstenschke/html2md.svg?branch=master)](https://travis-ci.org/kstenschke/html2md)
+[![CodeFactor](https://www.codefactor.io/repository/github/kstenschke/html2md/badge/master)](https://www.codefactor.io/repository/github/kstenschke/html2md/overview/master)
+[![GitHub license](https://img.shields.io/badge/license-mit-blue.svg)](https://raw.githubusercontent.com/kstenschke/html2md/master/LICENSE)
+
 html2md
 =======
 
