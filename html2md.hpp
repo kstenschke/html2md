@@ -38,6 +38,7 @@ class Converter {
   private:
     static constexpr const char *kTagAnchor = "a";
     static constexpr const char *kTagBold = "b";
+    static constexpr const char *kTagBreak = "br";
     static constexpr const char *kTagHeader1 = "h1";
     static constexpr const char *kTagHeader2 = "h2";
     static constexpr const char *kTagLink = "link";
@@ -47,11 +48,13 @@ class Converter {
     static constexpr const char *kTagScript = "script";
     static constexpr const char *kTagSpan = "span";
     static constexpr const char *kTagStrong = "strong";
+    static constexpr const char *kTagStyle = "style";
     static constexpr const char *kTagTitle = "title";
 
     bool is_in_tag_ = false;
     bool is_closing_tag_ = false;
     bool is_in_child_of_noscript_tag_ = false;
+    bool is_in_style_tag_ = false;
     bool is_in_attribute_value_ = false;
 
     char prev_ch_, prev_prev_ch_;
@@ -221,11 +224,15 @@ class Converter {
           md_ += "** ";
         } else if (current_tag_ == kTagNoScript) {
           is_in_child_of_noscript_tag_ = false;
+        } else if (current_tag_ == kTagStyle) {
+          is_in_style_tag_ = false;
         } else if (md_len_ > 0) {
           if (current_tag_ == kTagParagraph) {
-            md_ += "\n\n";
+            md_ += "  \n\n";
+          } else if (current_tag_ == kTagBreak) {
+            md_ += "  \n";
           } else if (current_tag_ == kTagSpan) {
-            md_ += "\n";
+            md_ += "  \n";
           } else if (current_tag_ == kTagTitle) {
             TurnLineIntoHeader1(&md_, &chars_in_curr_line);
           } else if (current_tag_ == kTagHeader1) {
@@ -241,6 +248,8 @@ class Converter {
           md_ += "**";
         } else if (current_tag_== kTagNoScript) {
           is_in_child_of_noscript_tag_ = true;
+        } else if (current_tag_== kTagStyle) {
+          is_in_style_tag_ = true;
         }
       }
 
@@ -253,6 +262,7 @@ class Converter {
 
     bool ParseCharInTagContent(char ch) {
       if (is_in_child_of_noscript_tag_
+          || is_in_style_tag_
           || current_tag_ == kTagLink
           || current_tag_ == kTagMeta
           || current_tag_ == kTagScript) return true;
