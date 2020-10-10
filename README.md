@@ -15,7 +15,7 @@ html2md
 
 ## What does it do?
 
-html2md is a C++ single header solution for HTML to markdown conversion.  
+html2md is a C++ single header solution for HTML to Markdown conversion.  
 
 
 ### Usage Example
