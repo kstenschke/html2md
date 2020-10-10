@@ -20,6 +20,17 @@ class Converter {
   }
 
  private:
+  static constexpr const char *kTagB = "b";
+  static constexpr const char *kTagH1 = "h1";
+  static constexpr const char *kTagH2 = "h2";
+  static constexpr const char *kTagLink = "link";
+  static constexpr const char *kTagMeta = "meta";
+  static constexpr const char *kTagNoScript = "noscript";
+  static constexpr const char *kTagScript = "script";
+  static constexpr const char *kTagSpan = "span";
+  static constexpr const char *kTagStrong = "strong";
+  static constexpr const char *kTagTitle = "title";
+
   bool is_in_tag_ = false;
   bool is_closing_tag_ = false;
   bool is_in_child_of_noscript_tag_ = false;
@@ -149,29 +160,29 @@ class Converter {
             // '>' = has left closing of tag
             is_closing_tag_ = false;
 
-            if (current_tag_ == "b" || current_tag_ == "strong") {
+            if (current_tag_ == kTagB || current_tag_ == kTagStrong) {
               if (prev_ch_ == ' ') md_ = md_.substr(0, md_.length() - 1);
 
               md_ += "** ";
-            } else if (current_tag_ == "noscript") {
+            } else if (current_tag_ == kTagNoScript) {
               is_in_child_of_noscript_tag_ = false;
             } else if (md_len_ > 0) {
-              if (current_tag_ == "span") {
+              if (current_tag_ == kTagSpan) {
                 md_ += "\n";
-              } else if (current_tag_ == "title") {
+              } else if (current_tag_ == kTagTitle) {
                 TurnLineIntoHeader1(&md_, &chars_in_curr_line);
-              } else if (current_tag_ == "h1") {
+              } else if (current_tag_ == kTagH1) {
                 TurnLineIntoHeader2(&md_, &chars_in_curr_line);
               }
             }
           } else {
             // '>' = has left opening of tag
 
-            if (current_tag_ == "b" || current_tag_ == "strong") {
+            if (current_tag_ == kTagB || current_tag_ == kTagStrong) {
               if (prev_ch_ != ' ') md_ += ' ';
 
               md_ += "**";
-            } else if (current_tag_ == "noscript") {
+            } else if (current_tag_ == kTagNoScript) {
               is_in_child_of_noscript_tag_ = true;
             }
           }
@@ -186,9 +197,9 @@ class Converter {
 
   bool ParseCharInTagContent(char ch) {
     if (is_in_child_of_noscript_tag_
-        || current_tag_ == "link"
-        || current_tag_ == "meta"
-        || current_tag_ == "script") return true;
+        || current_tag_ == kTagLink
+        || current_tag_ == kTagMeta
+        || current_tag_ == kTagScript) return true;
 
     prev_ch_ = md_len_ > 0 ? md_[md_len_ - 1] : '.';
     prev_prev_ch_ = md_len_ > 1 ? md_[md_len_ - 2] : '.';
