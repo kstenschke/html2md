@@ -20,5 +20,4 @@ before_install:
 script:
   - cmake CMakeLists.txt && make
   - cppcheck --enable=all ./html2md.hpp
-  - cpplint ./html2md.hpp --extensions=hpp
-  
+  - cpplint ./html2md.hpp
