@@ -212,7 +212,7 @@ class Converter {
     if (ch == ' ' && (prev_ch_ == ' ' || prev_ch_ == '\n')) return true;
 
     // prevent more than two consecutive newlines
-    if (ch=='\n' && prev_ch_=='\n' && prev_prev_ch_ == '\n') return true;
+    if (ch == '\n' && prev_ch_ == '\n' && prev_prev_ch_ == '\n') return true;
 
     md_ += ch;
 
