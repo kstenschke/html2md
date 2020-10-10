@@ -149,54 +149,58 @@ class Converter {
    */
   bool ParseCharInTag(char ch) {
     if (ch == '/' && current_tag_.empty()) {
-          is_closing_tag_ = true;
+      is_closing_tag_ = true;
 
-          return true;
-        }
+      return true;
+    }
 
-    if (ch == '>') {
-          is_in_tag_ = false;
-
-          current_tag_ = Explode(current_tag_, ' ')[0];
-          prev_ch_ = md_[md_.length() - 1];
-
-          if (is_closing_tag_) {
-            // '>' = has left closing of tag
-            is_closing_tag_ = false;
-
-            if (current_tag_ == kTagB || current_tag_ == kTagStrong) {
-              if (prev_ch_ == ' ') md_ = md_.substr(0, md_.length() - 1);
-
-              md_ += "** ";
-            } else if (current_tag_ == kTagNoScript) {
-              is_in_child_of_noscript_tag_ = false;
-            } else if (md_len_ > 0) {
-              if (current_tag_ == kTagSpan) {
-                md_ += "\n";
-              } else if (current_tag_ == kTagTitle) {
-                TurnLineIntoHeader1(&md_, &chars_in_curr_line);
-              } else if (current_tag_ == kTagH1) {
-                TurnLineIntoHeader2(&md_, &chars_in_curr_line);
-              }
-            }
-          } else {
-            // '>' = has left opening of tag
-
-            if (current_tag_ == kTagB || current_tag_ == kTagStrong) {
-              if (prev_ch_ != ' ') md_ += ' ';
-
-              md_ += "**";
-            } else if (current_tag_ == kTagNoScript) {
-              is_in_child_of_noscript_tag_ = true;
-            }
-          }
-
-          return true;
-        }
+    if (ch == '>') return OnHasLeftTag();
 
     current_tag_ += ch;
 
     return false;
+  }
+
+  // Current char: '>'
+  bool OnHasLeftTag() {
+    is_in_tag_ = false;
+
+    md_len_ = md_.length();
+    current_tag_ = Explode(current_tag_, ' ')[0];
+    prev_ch_ = md_[md_len_ - 1];
+
+    if (is_closing_tag_) {
+      // '>' = has left closing of tag
+      is_closing_tag_ = false;
+
+      if (current_tag_== kTagB || current_tag_== kTagStrong) {
+        if (prev_ch_ == ' ') md_ = md_.substr(0, md_len_ - 1);
+
+        md_ += "** ";
+      } else if (current_tag_ == kTagNoScript) {
+        is_in_child_of_noscript_tag_ = false;
+      } else if (md_len_ > 0) {
+        if (current_tag_ == kTagSpan) {
+          md_ += "\n";
+        } else if (current_tag_ == kTagTitle) {
+          TurnLineIntoHeader1(&md_, &chars_in_curr_line);
+        } else if (current_tag_ == kTagH1) {
+          TurnLineIntoHeader2(&md_, &chars_in_curr_line);
+        }
+      }
+    } else {
+      // '>' = has left opening of tag
+
+      if (current_tag_== kTagB || current_tag_== kTagStrong) {
+        if (prev_ch_ != ' ') md_ += ' ';
+
+        md_ += "**";
+      } else if (current_tag_== kTagNoScript) {
+        is_in_child_of_noscript_tag_ = true;
+      }
+    }
+
+    return true;
   }
 
   bool ParseCharInTagContent(char ch) {
