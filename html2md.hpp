@@ -31,6 +31,7 @@ class Converter {
   u_int16_t chars_in_curr_line = 0;
 
   std::string md_;
+  size_t  md_len_;
 
   Converter() = default;
 
@@ -95,29 +96,50 @@ class Converter {
 
     for (char ch : html) {
       if (!is_in_tag_ && ch=='<') {
-        is_in_tag_ = true;
-        current_tag_ = "";
-
-        if (!md_.empty()) {
-          prev_ch_ = md_[md_.length() - 1];
-
-          if (prev_ch_!=' ' && prev_ch_!='\n')
-            md_ += ' ';
-        }
+        OnHasEnteredTag();
 
         continue;
       }
 
-      auto md_len = md_.length();
+      md_len_ = md_.length();
 
-      if (is_in_tag_) {
-        if (ch=='/' && current_tag_.empty()) {
+      if (is_in_tag_ && ParseCharInTag(ch)) continue;
+
+      if (!is_in_tag_ && ParseCharInTagContent(ch)) continue;
+
+      if (md_len_ > 400) break;
+    }
+
+    return md_;
+  }
+
+  // Current char: '<'
+  void OnHasEnteredTag() {
+    is_in_tag_ = true;
+    current_tag_ = "";
+
+    if (!md_.empty()) {
+      prev_ch_ = md_[md_.length() - 1];
+
+      if (prev_ch_!=' ' && prev_ch_!='\n')
+        md_ += ' ';
+    }
+  }
+
+  /**
+   * Handle next char within <...> tag
+   *
+   * @param ch current character
+   * @return   continue surrounding iteration?
+   */
+  bool ParseCharInTag(char ch) {
+    if (ch == '/' && current_tag_.empty()) {
           is_closing_tag_ = true;
 
-          continue;
+          return true;
         }
 
-        if (ch=='>') {
+    if (ch == '>') {
           is_in_tag_ = false;
 
           current_tag_ = Explode(current_tag_, ' ')[0];
@@ -133,7 +155,7 @@ class Converter {
               md_ += "** ";
             } else if (current_tag_=="noscript") {
               is_in_child_of_noscript_tag_ = false;
-            } else if (md_len > 0) {
+            } else if (md_len_ > 0) {
               if (current_tag_=="span") {
                 md_ += "\n";
               } else if (current_tag_=="title") {
@@ -154,37 +176,35 @@ class Converter {
             }
           }
 
-          continue;
+          return true;
         }
 
-        current_tag_ += ch;
-      }
+    current_tag_ += ch;
 
-      if (!is_in_tag_) {
-        if (is_in_child_of_noscript_tag_
-            || current_tag_=="link"
-            || current_tag_=="meta"
-            || current_tag_=="script")
-          continue;
+    return false;
+  }
 
-        prev_ch_ = md_len > 0 ? md_[md_len - 1] : '.';
-        prev_prev_ch_ = md_len > 1 ? md_[md_len - 2] : '.';
+  bool ParseCharInTagContent(char ch) {
+    if (is_in_child_of_noscript_tag_
+        || current_tag_=="link"
+        || current_tag_=="meta"
+        || current_tag_=="script") return true;
 
-        if (ch==' ' && (prev_ch_==' ' || prev_ch_=='\n'))
-          continue;  // prevent more than two consecutive spaces
+    prev_ch_ = md_len_ > 0 ? md_[md_len_ - 1] : '.';
+    prev_prev_ch_ = md_len_ > 1 ? md_[md_len_ - 2] : '.';
 
-        if (ch=='\n' && prev_ch_=='\n' && prev_prev_ch_=='\n')
-          continue;  // prevent more than two consecutive newlines
+    // prevent more than one consecutive spaces
+    if (ch == ' ' && (prev_ch_ == ' ' || prev_ch_ == '\n')) return true;
 
-        md_ += ch;
 
-        if (ch!='\n') ++chars_in_curr_line;
-      }
+    // prevent more than two consecutive newlines
+    if (ch=='\n' && prev_ch_=='\n' && prev_prev_ch_=='\n') return true;
 
-      if (md_len > 400) break;
-    }
+    md_ += ch;
 
-    return md_;
+    if (ch!='\n') ++chars_in_curr_line;
+
+    return false;
   }
 };  // Converter
 
