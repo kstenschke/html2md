@@ -8,13 +8,19 @@
 #include <sstream>
 #include <utility>
 #include <vector>
+#include <regex>
 
 namespace html2md {
 
 class Converter {
  public:
-  static std::string Convert(const std::string &html) {
+  static std::string Convert(std::string &html) {
     auto *instance = new Converter();
+
+    ReplaceAll(&html, "\t", " ");
+
+//    std::regex exp("<a href=\"(.*)\"([ a-z=\"0-9]*)>(.*)</a>");
+//    html = std::regex_replace(html, exp, "[$3]($1)");
 
     auto md = instance
         ->Convert2Md(html)
@@ -37,6 +43,7 @@ class Converter {
     static constexpr const char *kTagLink = "link";
     static constexpr const char *kTagMeta = "meta";
     static constexpr const char *kTagNoScript = "noscript";
+    static constexpr const char *kTagParagraph = "p";
     static constexpr const char *kTagScript = "script";
     static constexpr const char *kTagSpan = "span";
     static constexpr const char *kTagStrong = "strong";
@@ -60,7 +67,7 @@ class Converter {
 
     Converter() = default;
 
-    int ReplaceAll(std::string *haystack,
+    static int ReplaceAll(std::string *haystack,
                    const std::string &needle,
                    const std::string &replacement) {
       // Get first occurrence
@@ -116,9 +123,7 @@ class Converter {
       *chars_in_line = 0;
     }
 
-    Converter* Convert2Md(std::string html) {
-      ReplaceAll(&html, "\t", " ");
-
+    Converter* Convert2Md(const std::string html) {
       for (char ch : html) {
         if (!is_in_tag_ && ch == '<') {
           OnHasEnteredTag();
@@ -209,7 +214,7 @@ class Converter {
         is_closing_tag_ = false;
 
         if (current_tag_== kTagAnchor) {
-  //        md_ += '[';
+//        md_ += '[';
         } else if (current_tag_== kTagBold || current_tag_== kTagStrong) {
           if (prev_ch_ == ' ') ShortenMarkdown();
 
@@ -217,7 +222,9 @@ class Converter {
         } else if (current_tag_ == kTagNoScript) {
           is_in_child_of_noscript_tag_ = false;
         } else if (md_len_ > 0) {
-          if (current_tag_ == kTagSpan) {
+          if (current_tag_ == kTagParagraph) {
+            md_ += "\n\n";
+          } else if (current_tag_ == kTagSpan) {
             md_ += "\n";
           } else if (current_tag_ == kTagTitle) {
             TurnLineIntoHeader1(&md_, &chars_in_curr_line);
@@ -279,7 +286,7 @@ class Converter {
     }
 };  // Converter
 
-std::string Convert(const std::string &html) {
+std::string Convert(std::string &html) {
   return html2md::Converter::Convert(html);
 }
 
