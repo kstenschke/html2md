@@ -52,6 +52,18 @@ std::string Repeat(const std::string& str, u_int16_t amount) {
   return out;
 }
 
+void TurnLineIntoHeader1(std::string &md, u_int16_t &chars_in_line) {
+  md += "\n" + Repeat("=", chars_in_line) + "\n";
+
+  chars_in_line = 0;
+}
+
+void TurnLineIntoHeader2(std::string &md, u_int16_t &chars_in_line) {
+  md += "\n" + Repeat("-", chars_in_line) + "\n";
+
+  chars_in_line = 0;
+}
+
 std::string Html2Text(std::string html) {
   ReplaceAll(&html, "\t", " ");
 
@@ -105,10 +117,9 @@ std::string Html2Text(std::string html) {
             if (current_tag == "span") {
               md += "\n";
             } else if (current_tag == "title") {
-              // closing tag of title
-              md += "\n" + Repeat("=", chars_in_line) + "\n";
-
-              chars_in_line = 0;
+              TurnLineIntoHeader1(md, chars_in_line);
+            } else if (current_tag == "h1") {
+              TurnLineIntoHeader2(md, chars_in_line);
             }
           }
         } else if (current_tag == "noscript") {
