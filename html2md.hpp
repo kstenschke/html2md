@@ -28,6 +28,8 @@ class Converter {
 
     delete instance;
 
+    ReplaceAll(&md, " , ", ", ");
+
     return md;
   }
 
