@@ -58,7 +58,7 @@ class Converter {
 
     int amount_replaced = 0;
 
-    // Repeat till end is reached
+    // Repeat until end is reached
     while (pos != std::string::npos) {
       // Replace this occurrence of sub string
       (*haystack).replace(pos, needle.size(), replacement);
@@ -83,7 +83,7 @@ class Converter {
     return result;
   }
 
-  // Repeat given string given amount
+  // Repeat given amount of given string
   std::string Repeat(const std::string &str, u_int16_t amount) {
     std::string out;
 
