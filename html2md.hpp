@@ -5,12 +5,15 @@
 #define HTML2MD_HPP_
 
 #include <string>
-#include <vector>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 namespace html2md {
 
-int ReplaceAll(std::string *haystack, const std::string &needle, const std::string &replacement) {
+int ReplaceAll(std::string *haystack,
+               const std::string &needle,
+               const std::string &replacement) {
   // Get first occurrence
   size_t pos = (*haystack).find(needle);
 
