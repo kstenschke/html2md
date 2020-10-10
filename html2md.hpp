@@ -1,6 +1,9 @@
 // Copyright (c) Kay Stenschke
 // Licensed under the MIT License - https://opensource.org/licenses/MIT
 
+#ifndef HTML2MD_HPP_
+#define HTML2MD_HPP_
+
 #include <string>
 #include <vector>
 #include <sstream>
@@ -170,3 +173,5 @@ std::string Html2Text(std::string html) {
 }
 
 }  // namespace html2md
+
+#endif  // HTML2MD_HPP_
