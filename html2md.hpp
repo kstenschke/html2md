@@ -16,7 +16,11 @@ class Converter {
   static std::string Convert(const std::string &html) {
     auto *instance = new Converter();
 
-    return instance->Convert2Md(html);
+    auto md = instance->Convert2Md(html);
+
+    delete instance;
+
+    return md;
   }
 
  private:
