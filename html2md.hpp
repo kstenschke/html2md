@@ -7,9 +7,7 @@
 
 namespace html2md {
 
-int ReplaceAll(std::string *haystack,
-               const std::string &needle,
-               const std::string &replacement) {
+int ReplaceAll(std::string *haystack, const std::string &needle, const std::string &replacement) {
   // Get first occurrence
   size_t pos = (*haystack).find(needle);
 
@@ -30,8 +28,7 @@ int ReplaceAll(std::string *haystack,
 }
 
 // Split given string by given character delimiter into vector of strings
-std::vector<std::string> Explode(std::string const &str,
-                                         char delimiter) {
+std::vector<std::string> Explode(std::string const &str, char delimiter) {
   std::vector<std::string> result;
   std::istringstream iss(str);
 
@@ -107,11 +104,17 @@ std::string Html2Text(std::string html) {
         is_in_tag = false;
 
         current_tag = Explode(current_tag, ' ')[0];
+        prev_ch = md[md.length() - 1];
 
         if (is_closing_tag) {
+          // '>' = has left closing of tag
           is_closing_tag = false;
 
-          if (current_tag == "noscript") {
+          if (current_tag == "b" || current_tag == "strong") {
+            if (prev_ch == ' ') md = md.substr(0, md.length() - 1);
+
+            md += "** ";
+          } else if (current_tag == "noscript") {
             is_in_child_of_noscript_tag = false;
           } else if (md_len > 0) {
             if (current_tag == "span") {
@@ -122,8 +125,16 @@ std::string Html2Text(std::string html) {
               TurnLineIntoHeader2(md, chars_in_line);
             }
           }
-        } else if (current_tag == "noscript") {
-          is_in_child_of_noscript_tag = true;
+        } else {
+          // '>' = has left opening of tag
+
+          if (current_tag == "b" || current_tag == "strong") {
+            if (prev_ch != ' ') md += ' ';
+
+            md += "**";
+          } else if (current_tag == "noscript") {
+            is_in_child_of_noscript_tag = true;
+          }
         }
 
         continue;
