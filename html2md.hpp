@@ -44,7 +44,7 @@ class Converter {
     int amount_replaced = 0;
 
     // Repeat till end is reached
-    while (pos!=std::string::npos) {
+    while (pos != std::string::npos) {
       // Replace this occurrence of sub string
       (*haystack).replace(pos, needle.size(), replacement);
 
@@ -95,7 +95,7 @@ class Converter {
     ReplaceAll(&html, "\t", " ");
 
     for (char ch : html) {
-      if (!is_in_tag_ && ch=='<') {
+      if (!is_in_tag_ && ch == '<') {
         OnHasEnteredTag();
 
         continue;
@@ -121,7 +121,7 @@ class Converter {
     if (!md_.empty()) {
       prev_ch_ = md_[md_.length() - 1];
 
-      if (prev_ch_!=' ' && prev_ch_!='\n')
+      if (prev_ch_ != ' ' && prev_ch_ != '\n')
         md_ += ' ';
     }
   }
@@ -149,29 +149,29 @@ class Converter {
             // '>' = has left closing of tag
             is_closing_tag_ = false;
 
-            if (current_tag_=="b" || current_tag_=="strong") {
-              if (prev_ch_==' ') md_ = md_.substr(0, md_.length() - 1);
+            if (current_tag_ == "b" || current_tag_ == "strong") {
+              if (prev_ch_ == ' ') md_ = md_.substr(0, md_.length() - 1);
 
               md_ += "** ";
-            } else if (current_tag_=="noscript") {
+            } else if (current_tag_ == "noscript") {
               is_in_child_of_noscript_tag_ = false;
             } else if (md_len_ > 0) {
-              if (current_tag_=="span") {
+              if (current_tag_ == "span") {
                 md_ += "\n";
-              } else if (current_tag_=="title") {
+              } else if (current_tag_ == "title") {
                 TurnLineIntoHeader1(&md_, &chars_in_curr_line);
-              } else if (current_tag_=="h1") {
+              } else if (current_tag_ == "h1") {
                 TurnLineIntoHeader2(&md_, &chars_in_curr_line);
               }
             }
           } else {
             // '>' = has left opening of tag
 
-            if (current_tag_=="b" || current_tag_=="strong") {
-              if (prev_ch_!=' ') md_ += ' ';
+            if (current_tag_ == "b" || current_tag_ == "strong") {
+              if (prev_ch_ != ' ') md_ += ' ';
 
               md_ += "**";
-            } else if (current_tag_=="noscript") {
+            } else if (current_tag_ == "noscript") {
               is_in_child_of_noscript_tag_ = true;
             }
           }
@@ -186,9 +186,9 @@ class Converter {
 
   bool ParseCharInTagContent(char ch) {
     if (is_in_child_of_noscript_tag_
-        || current_tag_=="link"
-        || current_tag_=="meta"
-        || current_tag_=="script") return true;
+        || current_tag_ == "link"
+        || current_tag_ == "meta"
+        || current_tag_ == "script") return true;
 
     prev_ch_ = md_len_ > 0 ? md_[md_len_ - 1] : '.';
     prev_prev_ch_ = md_len_ > 1 ? md_[md_len_ - 2] : '.';
@@ -196,13 +196,12 @@ class Converter {
     // prevent more than one consecutive spaces
     if (ch == ' ' && (prev_ch_ == ' ' || prev_ch_ == '\n')) return true;
 
-
     // prevent more than two consecutive newlines
-    if (ch=='\n' && prev_ch_=='\n' && prev_prev_ch_=='\n') return true;
+    if (ch=='\n' && prev_ch_=='\n' && prev_prev_ch_ == '\n') return true;
 
     md_ += ch;
 
-    if (ch!='\n') ++chars_in_curr_line;
+    if (ch != '\n') ++chars_in_curr_line;
 
     return false;
   }
