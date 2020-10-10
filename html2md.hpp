@@ -8,8 +8,8 @@
 namespace html2md {
 
 int ReplaceAll(std::string *haystack,
-                       const std::string &needle,
-                       const std::string &replacement) {
+               const std::string &needle,
+               const std::string &replacement) {
   // Get first occurrence
   size_t pos = (*haystack).find(needle);
 
@@ -44,13 +44,13 @@ std::vector<std::string> Explode(std::string const &str,
 std::string Html2Text(std::string html) {
   ReplaceAll(&html, "\t", " ");
 
-  std::string text;
+  std::string md;
 
   bool is_in_tag = false;
   bool is_closing_tag = false;
   bool is_in_child_of_noscript_tag = false;
 
-  char prev_ch;
+  char prev_ch, preprev_ch;
 
   std::string current_tag;
 
@@ -59,15 +59,17 @@ std::string Html2Text(std::string html) {
       is_in_tag = true;
       current_tag = "";
 
-      if (!text.empty()) {
-        prev_ch = text[text.length() - 1];
+      if (!md.empty()) {
+        prev_ch = md[md.length() - 1];
 
         if (prev_ch != ' ' && prev_ch != '\n')
-          text += ' ';
+          md += ' ';
       }
 
       continue;
     }
+
+    auto md_len = md.length();
 
     if (is_in_tag) {
       if (ch == '/' && current_tag.empty()) {
@@ -86,11 +88,11 @@ std::string Html2Text(std::string html) {
 
           if (current_tag == "noscript") {
             is_in_child_of_noscript_tag = false;
-          } else if (text.length() > 0) {
+          } else if (md_len > 0) {
             if (current_tag == "span") {
-              text += "\n";
+              md += "\n";
             } else if (current_tag == "title") {
-              text += "\n\n";
+              md += "\n\n";
             }
           }
         } else if (current_tag == "noscript") {
@@ -109,16 +111,22 @@ std::string Html2Text(std::string html) {
           || current_tag == "meta"
           || current_tag == "script") continue;
 
-      prev_ch = text[text.length() - 1];
+      prev_ch = md_len > 0 ? md[md_len - 1] : '.';
+      preprev_ch = md_len > 1 ? md[md_len - 2] : '.';
 
-      if (ch == ' '
-          && (prev_ch == ' ' || prev_ch == '\n')) continue;
+      if (ch == ' ' && (prev_ch == ' ' || prev_ch == '\n'))
+        continue;  // prevent more than two consecutive spaces
 
-      text += ch;
+      if (ch == '\n' && prev_ch == '\n' && preprev_ch == '\n')
+        continue;  // prevent more than two consecutive newlines
+
+      md += ch;
     }
+
+//    if (md_len > 400) break;
   }
 
-  return text;
+  return md;
 }
 
 }  // namespace html2md
