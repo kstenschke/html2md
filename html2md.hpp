@@ -41,6 +41,17 @@ std::vector<std::string> Explode(std::string const &str,
   return result;
 }
 
+// Repeat given string given amount
+std::string Repeat(const std::string& str, u_int16_t amount) {
+  std::string out;
+
+  for (u_int16_t i = 0; i < amount; i++) {
+    out+= str;
+  }
+
+  return out;
+}
+
 std::string Html2Text(std::string html) {
   ReplaceAll(&html, "\t", " ");
 
@@ -50,9 +61,11 @@ std::string Html2Text(std::string html) {
   bool is_closing_tag = false;
   bool is_in_child_of_noscript_tag = false;
 
-  char prev_ch, preprev_ch;
+  char prev_ch, prev_prev_ch;
 
   std::string current_tag;
+
+  u_int16_t chars_in_line = 0;
 
   for (char ch : html) {
     if (!is_in_tag && ch == '<') {
@@ -92,7 +105,10 @@ std::string Html2Text(std::string html) {
             if (current_tag == "span") {
               md += "\n";
             } else if (current_tag == "title") {
-              md += "\n\n";
+              // closing tag of title
+              md += "\n" + Repeat("=", chars_in_line) + "\n";
+
+              chars_in_line = 0;
             }
           }
         } else if (current_tag == "noscript") {
@@ -112,18 +128,20 @@ std::string Html2Text(std::string html) {
           || current_tag == "script") continue;
 
       prev_ch = md_len > 0 ? md[md_len - 1] : '.';
-      preprev_ch = md_len > 1 ? md[md_len - 2] : '.';
+      prev_prev_ch = md_len > 1 ? md[md_len - 2] : '.';
 
       if (ch == ' ' && (prev_ch == ' ' || prev_ch == '\n'))
         continue;  // prevent more than two consecutive spaces
 
-      if (ch == '\n' && prev_ch == '\n' && preprev_ch == '\n')
+      if (ch == '\n' && prev_ch == '\n' && prev_prev_ch == '\n')
         continue;  // prevent more than two consecutive newlines
 
       md += ch;
+
+      if (ch != '\n') ++chars_in_line;
     }
 
-//    if (md_len > 400) break;
+    if (md_len > 400) break;
   }
 
   return md;
