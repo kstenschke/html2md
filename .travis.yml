@@ -1,0 +1,24 @@
+language: cpp
+
+os:
+  - linux
+
+compiler:
+  - gcc
+  - clang
+
+addons:
+  apt:
+    packages:
+      - cppcheck
+      - cmake
+      - gcc-4.8
+
+before_install:
+  - sudo pip install cpplint
+
+script:
+  - cmake CMakeLists.txt && make
+  - cppcheck --enable=all ./html2md.hpp
+  - cpplint ./html2md.hpp --extensions=hpp
+  
