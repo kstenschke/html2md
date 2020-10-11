@@ -8,7 +8,7 @@
 #include <sstream>
 #include <utility>
 #include <vector>
-#include <regex>
+#include <regex>  // NOLINT [build/c++11]
 
 namespace html2md {
 
@@ -17,7 +17,7 @@ class Converter {
   static std::string Convert(std::string *html) {
     auto *instance = new Converter();
 
-    *html = PrepareHtml(*html);
+    PrepareHtml(html);
 
     auto md = instance
         ->Convert2Md(*html)
@@ -25,33 +25,30 @@ class Converter {
 
     delete instance;
 
-    md = CleanUpMarkdown(md);
+    CleanUpMarkdown(&md);
 
     return md;
   }
 
-  static std::string &CleanUpMarkdown(std::string &md) {
-    TidyAllLines(&md);
+  static void CleanUpMarkdown(std::string *md) {
+    TidyAllLines(md);
 
-    ReplaceAll(&md, " , ", ", ");
-    ReplaceAll(&md, "\n.\n", ".\n");
-    ReplaceAll(&md, "\n↵\n", " ↵\n");
-    ReplaceAll(&md, "\n*\n", "\n");
-    ReplaceAll(&md, "\n. ", ".\n");
-
-    return md;
+    ReplaceAll(md, " , ", ", ");
+    ReplaceAll(md, "\n.\n", ".\n");
+    ReplaceAll(md, "\n↵\n", " ↵\n");
+    ReplaceAll(md, "\n*\n", "\n");
+    ReplaceAll(md, "\n. ", ".\n");
   }
 
-  static std::string &PrepareHtml(std::string &html) {
-    ReplaceAll(&html, "\t", " ");
-    ReplaceAll(&html, "&amp;", "&");
-    ReplaceAll(&html, "&nbsp;", " ");
-    ReplaceAll(&html, "&rarr;", "→");
+  static void PrepareHtml(std::string *html) {
+    ReplaceAll(html, "\t", " ");
+    ReplaceAll(html, "&amp;", "&");
+    ReplaceAll(html, "&nbsp;", " ");
+    ReplaceAll(html, "&rarr;", "→");
 
     std::regex exp("<!--(.*?)-->");
-    html = regex_replace(html, exp, "");
 
-    return html;
+    *html = regex_replace(*html, exp, "");
   }
 
   const std::string &GetMd_() const {
