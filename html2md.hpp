@@ -14,13 +14,13 @@ namespace html2md {
 
 class Converter {
  public:
-  static std::string Convert(std::string &html) {
+  static std::string Convert(std::string *html) {
     auto *instance = new Converter();
 
-    html = PrepareHtml(html);
+    *html = PrepareHtml(*html);
 
     auto md = instance
-        ->Convert2Md(html)
+        ->Convert2Md(*html)
         ->GetMd_();
 
     delete instance;
@@ -49,7 +49,7 @@ class Converter {
     ReplaceAll(&html, "&nbsp;", " ");
     ReplaceAll(&html, "&rarr;", "→");
 
-    std::__1::regex exp("<!--(.*?)-->");
+    std::regex exp("<!--(.*?)-->");
     html = regex_replace(html, exp, "");
 
     return html;
@@ -59,7 +59,7 @@ class Converter {
     return md_;
   }
 
-  private:
+   private:
     static constexpr const char *kTagAnchor = "a";
     static constexpr const char *kTagBold = "b";
     static constexpr const char *kTagBreak = "br";
@@ -88,7 +88,8 @@ class Converter {
     bool is_in_style_tag_ = false;
     bool is_in_attribute_value_ = false;
 
-    bool is_in_ordered_list_ = true;  // relevant only for <li>, false = is in unordered list
+    // relevant for <li> only, false = is in unordered list
+    bool is_in_ordered_list_ = true;
     int index_li;
 
     char prev_ch_, prev_prev_ch_;
@@ -280,13 +281,13 @@ class Converter {
     void OnHasLeftOpeningTag() {
       // '>' = has left opening-tag
       if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
-        if (prev_ch_!=' ') md_ += ' ';
+        if (prev_ch_ != ' ') md_ += ' ';
 
         md_ += "**";
       } else if (current_tag_ == kTagHeader2) {
-        if (prev_ch_!='\n') md_ += '\n';
+        if (prev_ch_ != '\n') md_ += '\n';
 
-        if (prev_prev_ch_!='\n') md_ += '\n';
+        if (prev_prev_ch_ != '\n') md_ += '\n';
 
         md_ += "### ";
       } else if (current_tag_ == kTagHeader3) {
@@ -385,7 +386,7 @@ class Converter {
       ++chars_in_curr_line;
 
       if (chars_in_curr_line > 120) {
-        // TODO: find offset of previous ' ' and insert newline there
+        // TODO(kay): find offset of previous ' ' and insert newline there
         md_ += "\n";
         chars_in_curr_line = 0;
       }
@@ -394,8 +395,8 @@ class Converter {
     }
 };  // Converter
 
-std::string Convert(std::string &html) {
-  return html2md::Converter::Convert(html);
+std::string Convert(std::string html) {
+  return html2md::Converter::Convert(&html);
 }
 
 
