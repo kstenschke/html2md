@@ -4,11 +4,12 @@
 #ifndef HTML2MD_HPP_
 #define HTML2MD_HPP_
 
-#include <string>
+#include <functional>
+#include <regex>  // NOLINT [build/c++11]
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
-#include <regex>  // NOLINT [build/c++11]
 
 namespace html2md {
 
