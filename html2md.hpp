@@ -315,40 +315,26 @@ class Converter {
   void OnHasLeftOpeningTag() {
     // '>' = has left opening-tag
     if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
-      if (prev_ch_ != ' ') {
-        md_ += ' ';
-        ++chars_in_curr_line_;
-      }
+      if (prev_ch_ != ' ') AppendToMd(' ');
 
-      md_ += "**";
+      AppendToMd("**");
       ++chars_in_curr_line_;
     } else if (current_tag_ == kTagHeader2) {
-      md_ += "\n\n\n### ";
-      chars_in_curr_line_ = 4;
+      AppendToMd("\n\n\n### ");
     } else if (current_tag_ == kTagHeader3) {
-      md_ += "\n\n\n#### ";
-      chars_in_curr_line_ = 5;
+      AppendToMd("\n\n\n#### ");
     } else if (current_tag_ == kTagHeader4) {
-      md_ += "\n\n\n##### ";
-      chars_in_curr_line_ = 6;
+      AppendToMd("\n\n\n##### ");
     } else if (current_tag_ == kTagListItem) {
-      if (prev_ch_ != '\n') md_ += '\n';
+      if (prev_ch_ != '\n') AppendToMd('\n');
 
-      md_ += "* ";
-      chars_in_curr_line_ = 2;
+      AppendToMd("* ");
     } else if (current_tag_ == kTagUnorderedList
         || current_tag_ == kTagOrderedList
         || current_tag_ == kTagDiv) {
-      if (prev_ch_ != '\n') {
-        md_ += '\n';
-        chars_in_curr_line_ = 0;
-      }
+      if (prev_ch_ != '\n') AppendToMd('\n');
 
-      if (prev_prev_ch_ != '\n') {
-        md_ += '\n';
-        chars_in_curr_line_ = 0;
-      }
-
+      if (prev_prev_ch_ != '\n') AppendToMd('\n');
     } else if (current_tag_ == kTagNoScript) {
       is_in_child_of_noscript_tag_ = true;
     } else if (current_tag_ == kTagScript) {
@@ -357,6 +343,28 @@ class Converter {
       is_in_style_tag_ = true;
     } else if (current_tag_ == kTagTemplate) {
       is_in_template_tag_ = true;
+    }
+  }
+
+  void AppendToMd(char ch) {
+    md_ += ch;
+
+    if (ch == '\n')
+      chars_in_curr_line_ = 0;
+    else
+      ++chars_in_curr_line_;
+  }
+
+  void AppendToMd(const char *str) {
+    md_ += str;
+
+    auto str_len = strlen(str);
+
+    for (int i = 0; i < str_len; ++i) {
+      if (str[i] == '\n')
+        chars_in_curr_line_ = 0;
+      else
+        ++chars_in_curr_line_;
     }
   }
 
@@ -369,12 +377,11 @@ class Converter {
     } else if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
       if (prev_ch_ == ' ') ShortenMarkdown();
 
-      md_ += "**";
+      AppendToMd("**");
     } else if (current_tag_ == kTagHeader2
         || current_tag_ == kTagHeader3
         || current_tag_ == kTagHeader4) {
-      md_ += "\n\n";
-      chars_in_curr_line_ = 0;
+      AppendToMd("\n\n");
     } else if (current_tag_ == kTagNoScript) {
       is_in_child_of_noscript_tag_ = false;
     } else if (current_tag_ == kTagScript) {
@@ -385,13 +392,11 @@ class Converter {
       is_in_template_tag_ = false;
     } else if (md_len_ > 0) {
       if (current_tag_ == kTagParagraph) {
-        md_ += "  \n\n";
-        chars_in_curr_line_ = 0;
+        AppendToMd("  \n\n");
       } else if (current_tag_ == kTagBreak
           || current_tag_ == kTagOption
           || current_tag_ == kTagListItem) {
-        md_ += "  \n";
-        chars_in_curr_line_ = 0;
+        AppendToMd("  \n");
       } else if (current_tag_ == kTagSpan) {
         if (prev_ch_ != ' ') md_ += " ";
       } else if (current_tag_ == kTagTitle) {
