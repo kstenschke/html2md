@@ -18,9 +18,10 @@ class Converter {
     auto *instance = new Converter();
 
     ReplaceAll(&html, "\t", " ");
+    ReplaceAll(&html, "&nbsp;", " ");
 
-//    std::regex exp("<a href=\"(.*)\"([ a-z=\"0-9]*)>(.*)</a>");
-//    html = std::regex_replace(html, exp, "[$3]($1)");
+    std::regex exp("<!--(.*?)-->");
+    html = std::regex_replace(html, exp, "");
 
     auto md = instance
         ->Convert2Md(html)
@@ -28,7 +29,11 @@ class Converter {
 
     delete instance;
 
+    RTrimAllLines(&md);
+
     ReplaceAll(&md, " , ", ", ");
+    ReplaceAll(&md, "\n.\n", ".\n");
+    ReplaceAll(&md, "### ", "###");
 
     return md;
   }
@@ -43,6 +48,7 @@ class Converter {
     static constexpr const char *kTagBreak = "br";
     static constexpr const char *kTagHeader1 = "h1";
     static constexpr const char *kTagHeader2 = "h2";
+    static constexpr const char *kTagHeader3 = "h3";
     static constexpr const char *kTagLink = "link";
     static constexpr const char *kTagMeta = "meta";
     static constexpr const char *kTagNoScript = "noscript";
@@ -72,6 +78,29 @@ class Converter {
 
     Converter() = default;
 
+    // Trim from end (in place)
+    static void RTrim(std::string *s) {
+      (*s).erase(
+          std::find_if(
+              (*s).rbegin(),
+              (*s).rend(),
+              std::not1(std::ptr_fun<int, int>(std::isspace)))
+              .base(),
+          (*s).end());
+    }
+
+    static void RTrimAllLines(std::string *str) {
+      auto lines = Explode(*str, '\n');
+      std::string res;
+
+      for (auto line : lines) {
+        RTrim(&line);
+        res += line + "\n";
+      }
+
+      *str = res.substr(0, res.length() - 1);
+    };
+
     static int ReplaceAll(std::string *haystack,
                    const std::string &needle,
                    const std::string &replacement) {
@@ -95,7 +124,7 @@ class Converter {
     }
 
     // Split given string by given character delimiter into vector of strings
-    std::vector<std::string> Explode(std::string const &str, char delimiter) {
+    static std::vector<std::string> Explode(std::string const &str, char delimiter) {
       std::vector<std::string> result;
       std::istringstream iss(str);
 
@@ -106,7 +135,7 @@ class Converter {
     }
 
     // Repeat given amount of given string
-    std::string Repeat(const std::string &str, u_int16_t amount) {
+    static std::string Repeat(const std::string &str, u_int16_t amount) {
       std::string out;
 
       for (u_int16_t i = 0; i < amount; i++) {
@@ -142,7 +171,7 @@ class Converter {
 
         if (!is_in_tag_ && ParseCharInTagContent(ch)) continue;
 
-        if (md_len_ > 4000) break;
+//        if (md_len_ > 4000) break;
       }
 
       return this;
@@ -223,7 +252,9 @@ class Converter {
         } else if (current_tag_== kTagBold || current_tag_== kTagStrong) {
           if (prev_ch_ == ' ') ShortenMarkdown();
 
-          md_ += "** ";
+          md_ += "**";
+        } else if (current_tag_== kTagHeader2 || current_tag_== kTagHeader3) {
+          md_ += "\n";
         } else if (current_tag_ == kTagNoScript) {
           is_in_child_of_noscript_tag_ = false;
         } else if (current_tag_ == kTagStyle) {
@@ -242,12 +273,24 @@ class Converter {
           }
         }
       } else {
-        // '>' = has left opening of tag
+        // '>' = has left opening-tag
 
         if (current_tag_== kTagBold || current_tag_== kTagStrong) {
           if (prev_ch_ != ' ') md_ += ' ';
 
           md_ += "**";
+        } else if (current_tag_== kTagHeader2) {
+          if (prev_ch_ != '\n') md_ += '\n';
+
+          if (prev_prev_ch_ != '\n') md_ += '\n';
+
+          md_ += "###";
+        } else if (current_tag_== kTagHeader3) {
+          if (prev_ch_ != '\n') md_ += '\n';
+
+          if (prev_prev_ch_ != '\n') md_ += '\n';
+
+          md_ += "####";
         } else if (current_tag_== kTagNoScript) {
           is_in_child_of_noscript_tag_ = true;
         } else if (current_tag_== kTagStyle) {
@@ -273,25 +316,25 @@ class Converter {
       prev_prev_ch_ = md_len_ > 1 ? md_[md_len_ - 2] : '.';
 
       // prevent more than one consecutive spaces
-      if (ch == ' ' && (prev_ch_ == ' ' || prev_ch_ == '\n')) return true;
+      if (ch == ' ') {
+        if (md_len_ == 0
+            || (prev_ch_==' ' || prev_ch_=='\n')) return true;
+      }
 
-      // prevent more than two consecutive newlines
-      if (ch == '\n' && prev_ch_ == '\n' && prev_prev_ch_ == '\n') return true;
+      if (ch == '\n') return true;
 
-      if (ch != '\n') {
-        if (ch == '.' && prev_ch_ == ' ') {
-          ShortenMarkdown();
-          --chars_in_curr_line;
-        }
+      if (ch == '.' && prev_ch_ == ' ') {
+        ShortenMarkdown();
+        --chars_in_curr_line;
+      }
 
-        md_ += ch;
-        ++chars_in_curr_line;
+      md_ += ch;
+      ++chars_in_curr_line;
 
-        if (chars_in_curr_line > 120) {
-          // TODO: find offset of previous ' ' and insert newline there
-          md_ += "\n";
-          chars_in_curr_line = 0;
-        }
+      if (chars_in_curr_line > 120) {
+        // TODO: find offset of previous ' ' and insert newline there
+        md_ += "\n";
+        chars_in_curr_line = 0;
       }
 
       return false;

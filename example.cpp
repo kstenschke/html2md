@@ -6,7 +6,7 @@ int main() {
   FILE *fp;
   char path[1035];
 
-  fp = popen("curl https://en.wikipedia.org/wiki/Sumer", "r");
+  fp = popen("curl https://github.com/kstenschke/html2md", "r");
 
   if (fp ==nullptr) std::cerr << "Failed to run curl command";
 
