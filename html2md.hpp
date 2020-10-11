@@ -88,6 +88,7 @@ class Converter {
     bool is_in_child_of_noscript_tag_ = false;
     bool is_in_script_tag_ = false;
     bool is_in_style_tag_ = false;
+    bool is_in_svg_tag_ = false;
     bool is_in_template_tag_ = false;
     bool is_in_attribute_value_ = false;
 
@@ -98,10 +99,11 @@ class Converter {
     char prev_ch_, prev_prev_ch_;
 
     std::string current_tag_;
+    std::string prev_tag_;
     std::string current_attribute_;
     std::string current_attribute_value_;
 
-    u_int16_t chars_in_curr_line = 0;
+    u_int16_t chars_in_curr_line_ = 0;
 
     std::string md_;
     size_t  md_len_;
@@ -141,13 +143,13 @@ class Converter {
       auto lines = Explode(*str, '\n');
       std::string res;
 
-      bool amount_empty = 0;
+      int amount_empty = 0;
 
       for (auto line : lines) {
         Trim(&line);
 
         if (line.empty()) {
-          ++amount_empty;
+          amount_empty++;
 
           if (amount_empty < 3) res += "\n";
         } else {
@@ -239,6 +241,7 @@ class Converter {
     // Current char: '<'
     void OnHasEnteredTag() {
       is_in_tag_ = true;
+      prev_tag_ = current_tag_;
       current_tag_ = "";
 
       if (!md_.empty()) {
@@ -313,36 +316,54 @@ class Converter {
     void OnHasLeftOpeningTag() {
       // '>' = has left opening-tag
       if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
-        if (prev_ch_ != ' ') md_ += ' ';
+        if (prev_ch_ != ' ') {
+          md_ += ' ';
+          ++chars_in_curr_line_;
+        }
 
         md_ += "**";
+        ++chars_in_curr_line_;
       } else if (current_tag_ == kTagHeader2) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
-        md_ += "### ";
+        md_ += "\n### ";
+
+        chars_in_curr_line_ = 4;
       } else if (current_tag_ == kTagHeader3) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
-        md_ += "#### ";
+        md_ += "\n#### ";
+
+        chars_in_curr_line_ = 5;
       } else if (current_tag_ == kTagHeader4) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
-        md_ += "##### ";
+        md_ += "\n##### ";
+
+        chars_in_curr_line_ = 6;
       } else if (current_tag_ == kTagListItem) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         md_ += "* ";
+        chars_in_curr_line_ = 2;
       } else if (current_tag_ == kTagUnorderedList
         || current_tag_ == kTagOrderedList
         || current_tag_ == kTagDiv) {
-        if (prev_ch_ != '\n') md_ += '\n';
-        if (prev_prev_ch_ != '\n') md_ += '\n';
+        if (prev_ch_ != '\n') {
+          md_ += '\n';
+          chars_in_curr_line_ = 0;
+        }
+
+        if (prev_prev_ch_ != '\n') {
+          md_ += '\n';
+          chars_in_curr_line_ = 0;
+        }
 
       } else if (current_tag_ == kTagNoScript) {
         is_in_child_of_noscript_tag_ = true;
@@ -369,6 +390,7 @@ class Converter {
           || current_tag_ == kTagHeader3
           || current_tag_ == kTagHeader4) {
         md_ += "\n\n";
+        chars_in_curr_line_ = 0;
       } else if (current_tag_ == kTagNoScript) {
         is_in_child_of_noscript_tag_ = false;
       } else if (current_tag_ == kTagScript) {
@@ -380,16 +402,18 @@ class Converter {
       } else if (md_len_ > 0) {
         if (current_tag_ == kTagParagraph) {
           md_ += "  \n\n";
+          chars_in_curr_line_ = 0;
         } else if (current_tag_ == kTagBreak
             || current_tag_ == kTagOption
             || current_tag_ == kTagListItem) {
           md_ += "  \n";
+          chars_in_curr_line_ = 0;
         } else if (current_tag_ == kTagSpan) {
-          md_ += "  \n";
+          if (prev_ch_ != ' ') md_ += " ";
         } else if (current_tag_ == kTagTitle) {
-          TurnLineIntoHeader1(&md_, &chars_in_curr_line);
+          TurnLineIntoHeader1(&md_, &chars_in_curr_line_);
         } else if (current_tag_ == kTagHeader1) {
-          TurnLineIntoHeader2(&md_, &chars_in_curr_line);
+          TurnLineIntoHeader2(&md_, &chars_in_curr_line_);
         }
       }
     }
@@ -421,16 +445,16 @@ class Converter {
 
       if (ch == '.' && prev_ch_ == ' ') {
         ShortenMarkdown();
-        --chars_in_curr_line;
+        --chars_in_curr_line_;
       }
 
       md_ += ch;
-      ++chars_in_curr_line;
+      ++chars_in_curr_line_;
 
-      if (chars_in_curr_line > 120) {
+      if (chars_in_curr_line_ > 120 && ch == ' ') {
         // TODO(kay): find offset of previous ' ' and insert newline there
         md_ += "\n";
-        chars_in_curr_line = 0;
+        chars_in_curr_line_ = 0;
       }
 
       return false;
