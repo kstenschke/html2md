@@ -139,17 +139,18 @@ class Converter {
       auto lines = Explode(*str, '\n');
       std::string res;
 
-      int amount_empty = 0;
+      int amount_newlines = 0;
 
       for (auto line : lines) {
         Trim(&line);
 
         if (line.empty()) {
-          amount_empty++;
-
-          if (amount_empty < 3) res += "\n";
+          if (amount_newlines < 2) {
+            res += "\n";
+            amount_newlines++;
+          }
         } else {
-          amount_empty = 0;
+          amount_newlines = 0;
 
           res += line + "\n";
         }
@@ -320,25 +321,13 @@ class Converter {
         md_ += "**";
         ++chars_in_curr_line_;
       } else if (current_tag_ == kTagHeader2) {
-        if (prev_ch_ != '\n') md_ += '\n';
-
-        if (prev_prev_ch_ != '\n') md_ += '\n';
-
-        md_ += "\n### ";
+        md_ += "\n\n\n### ";
         chars_in_curr_line_ = 4;
       } else if (current_tag_ == kTagHeader3) {
-        if (prev_ch_ != '\n') md_ += '\n';
-
-        if (prev_prev_ch_ != '\n') md_ += '\n';
-
-        md_ += "\n#### ";
+        md_ += "\n\n\n#### ";
         chars_in_curr_line_ = 5;
       } else if (current_tag_ == kTagHeader4) {
-        if (prev_ch_ != '\n') md_ += '\n';
-
-        if (prev_prev_ch_ != '\n') md_ += '\n';
-
-        md_ += "\n##### ";
+        md_ += "\n\n\n##### ";
         chars_in_curr_line_ = 6;
       } else if (current_tag_ == kTagListItem) {
         if (prev_ch_ != '\n') md_ += '\n';
@@ -445,7 +434,6 @@ class Converter {
       ++chars_in_curr_line_;
 
       if (chars_in_curr_line_ > 80 && ch == ' ') {
-        // TODO(kay): find offset of previous ' ' and insert newline there
         md_ += "\n";
         chars_in_curr_line_ = 0;
       }
