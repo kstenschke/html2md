@@ -17,11 +17,7 @@ class Converter {
   static std::string Convert(std::string &html) {
     auto *instance = new Converter();
 
-    ReplaceAll(&html, "\t", " ");
-    ReplaceAll(&html, "&nbsp;", " ");
-
-    std::regex exp("<!--(.*?)-->");
-    html = std::regex_replace(html, exp, "");
+    html = PrepareHtml(html);
 
     auto md = instance
         ->Convert2Md(html)
@@ -29,13 +25,31 @@ class Converter {
 
     delete instance;
 
+    md = CleanUpMarkdown(md);
+
+    return md;
+  }
+
+  static std::string &CleanUpMarkdown(std::string &md) {
     RTrimAllLines(&md);
 
     ReplaceAll(&md, " , ", ", ");
     ReplaceAll(&md, "\n.\n", ".\n");
+    ReplaceAll(&md, "\n. ", ".\n");
     ReplaceAll(&md, "### ", "###");
 
     return md;
+  }
+
+  static std::string &PrepareHtml(std::string &html) {
+    ReplaceAll(&html, "\t", " ");
+    ReplaceAll(&html, "&amp;", "&");
+    ReplaceAll(&html, "&nbsp;", " ");
+
+    std::__1::regex exp("<!--(.*?)-->");
+    html = regex_replace(html, exp, "");
+
+    return html;
   }
 
   const std::string &GetMd_() const {
@@ -49,21 +63,29 @@ class Converter {
     static constexpr const char *kTagHeader1 = "h1";
     static constexpr const char *kTagHeader2 = "h2";
     static constexpr const char *kTagHeader3 = "h3";
+    static constexpr const char *kTagHeader4 = "h4";
     static constexpr const char *kTagLink = "link";
+    static constexpr const char *kTagListItem = "li";
     static constexpr const char *kTagMeta = "meta";
     static constexpr const char *kTagNoScript = "noscript";
+    static constexpr const char *kTagOption = "option";
+    static constexpr const char *kTagOrderedList = "ol";
     static constexpr const char *kTagParagraph = "p";
     static constexpr const char *kTagScript = "script";
     static constexpr const char *kTagSpan = "span";
     static constexpr const char *kTagStrong = "strong";
     static constexpr const char *kTagStyle = "style";
     static constexpr const char *kTagTitle = "title";
+    static constexpr const char *kTagUnorderedList = "ul";
 
     bool is_in_tag_ = false;
     bool is_closing_tag_ = false;
     bool is_in_child_of_noscript_tag_ = false;
     bool is_in_style_tag_ = false;
     bool is_in_attribute_value_ = false;
+
+    bool is_in_ordered_list_ = true;  // relevant only for <li>, false = is in unordered list
+    int index_li;
 
     char prev_ch_, prev_prev_ch_;
 
@@ -243,62 +265,87 @@ class Converter {
       current_tag_ = Explode(current_tag_, ' ')[0];
       prev_ch_ = md_[md_len_ - 1];
 
-      if (is_closing_tag_) {
-        // '>' = has left closing of tag
-        is_closing_tag_ = false;
-
-        if (current_tag_== kTagAnchor) {
-//        md_ += '[';
-        } else if (current_tag_== kTagBold || current_tag_== kTagStrong) {
-          if (prev_ch_ == ' ') ShortenMarkdown();
-
-          md_ += "**";
-        } else if (current_tag_== kTagHeader2 || current_tag_== kTagHeader3) {
-          md_ += "\n";
-        } else if (current_tag_ == kTagNoScript) {
-          is_in_child_of_noscript_tag_ = false;
-        } else if (current_tag_ == kTagStyle) {
-          is_in_style_tag_ = false;
-        } else if (md_len_ > 0) {
-          if (current_tag_ == kTagParagraph) {
-            md_ += "  \n\n";
-          } else if (current_tag_ == kTagBreak) {
-            md_ += "  \n";
-          } else if (current_tag_ == kTagSpan) {
-            md_ += "  \n";
-          } else if (current_tag_ == kTagTitle) {
-            TurnLineIntoHeader1(&md_, &chars_in_curr_line);
-          } else if (current_tag_ == kTagHeader1) {
-            TurnLineIntoHeader2(&md_, &chars_in_curr_line);
-          }
-        }
-      } else {
-        // '>' = has left opening-tag
-
-        if (current_tag_== kTagBold || current_tag_== kTagStrong) {
-          if (prev_ch_ != ' ') md_ += ' ';
-
-          md_ += "**";
-        } else if (current_tag_== kTagHeader2) {
-          if (prev_ch_ != '\n') md_ += '\n';
-
-          if (prev_prev_ch_ != '\n') md_ += '\n';
-
-          md_ += "###";
-        } else if (current_tag_== kTagHeader3) {
-          if (prev_ch_ != '\n') md_ += '\n';
-
-          if (prev_prev_ch_ != '\n') md_ += '\n';
-
-          md_ += "####";
-        } else if (current_tag_== kTagNoScript) {
-          is_in_child_of_noscript_tag_ = true;
-        } else if (current_tag_== kTagStyle) {
-          is_in_style_tag_ = true;
-        }
-      }
+      if (is_closing_tag_)
+        OnHasLeftClosingTag();
+      else
+        OnHasLeftOpeningTag();
 
       return true;
+    }
+
+    void OnHasLeftOpeningTag() {
+      // '>' = has left opening-tag
+      if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
+        if (prev_ch_!=' ') md_ += ' ';
+
+        md_ += "**";
+      } else if (current_tag_ == kTagHeader2) {
+        if (prev_ch_!='\n') md_ += '\n';
+
+        if (prev_prev_ch_!='\n') md_ += '\n';
+
+        md_ += "###";
+      } else if (current_tag_ == kTagHeader3) {
+        if (prev_ch_ != '\n') md_ += '\n';
+
+        if (prev_prev_ch_ != '\n') md_ += '\n';
+
+        md_ += "####";
+      } else if (current_tag_ == kTagHeader4) {
+        if (prev_ch_ != '\n') md_ += '\n';
+
+        if (prev_prev_ch_ != '\n') md_ += '\n';
+
+        md_ += "#####";
+      } else if (current_tag_ == kTagListItem) {
+        if (prev_ch_ != '\n') md_ += '\n';
+
+        md_ += "* ";
+      } else if (current_tag_ == kTagUnorderedList
+        || current_tag_ == kTagOrderedList ) {
+        if (prev_ch_ != '\n') md_ += '\n';
+        if (prev_prev_ch_ != '\n') md_ += '\n';
+
+      } else if (current_tag_ == kTagNoScript) {
+        is_in_child_of_noscript_tag_ = true;
+      } else if (current_tag_ == kTagStyle) {
+        is_in_style_tag_ = true;
+      }
+    }
+
+    void OnHasLeftClosingTag() {
+      // '>' = has left closing-tag
+      is_closing_tag_ = false;
+
+      if (current_tag_ == kTagAnchor) {
+//        md_ += '[';
+      } else if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
+        if (prev_ch_ == ' ') ShortenMarkdown();
+
+        md_ += "**";
+      } else if (current_tag_ == kTagHeader2
+          || current_tag_ == kTagHeader3
+          || current_tag_ == kTagHeader4) {
+        md_ += "\n\n";
+      } else if (current_tag_ == kTagNoScript) {
+        is_in_child_of_noscript_tag_ = false;
+      } else if (current_tag_ == kTagStyle) {
+        is_in_style_tag_ = false;
+      } else if (md_len_ > 0) {
+        if (current_tag_ == kTagParagraph) {
+          md_ += "  \n\n";
+        } else if (current_tag_ == kTagBreak
+            || current_tag_ == kTagOption
+            || current_tag_ == kTagListItem) {
+          md_ += "  \n";
+        } else if (current_tag_ == kTagSpan) {
+          md_ += "  \n";
+        } else if (current_tag_ == kTagTitle) {
+          TurnLineIntoHeader1(&md_, &chars_in_curr_line);
+        } else if (current_tag_ == kTagHeader1) {
+          TurnLineIntoHeader2(&md_, &chars_in_curr_line);
+        }
+      }
     }
 
     void ShortenMarkdown(int chars = 1) {
@@ -318,7 +365,8 @@ class Converter {
       // prevent more than one consecutive spaces
       if (ch == ' ') {
         if (md_len_ == 0
-            || (prev_ch_==' ' || prev_ch_=='\n')) return true;
+            || prev_ch_== ' '
+            || prev_ch_=='\n') return true;
       }
 
       if (ch == '\n') return true;
