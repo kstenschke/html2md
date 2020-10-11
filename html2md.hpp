@@ -38,7 +38,6 @@ class Converter {
     ReplaceAll(&md, "\n↵\n", " ↵\n");
     ReplaceAll(&md, "\n*\n", "\n");
     ReplaceAll(&md, "\n. ", ".\n");
-    ReplaceAll(&md, "### ", "###");
 
     return md;
   }
@@ -329,7 +328,6 @@ class Converter {
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
         md_ += "\n### ";
-
         chars_in_curr_line_ = 4;
       } else if (current_tag_ == kTagHeader3) {
         if (prev_ch_ != '\n') md_ += '\n';
@@ -337,7 +335,6 @@ class Converter {
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
         md_ += "\n#### ";
-
         chars_in_curr_line_ = 5;
       } else if (current_tag_ == kTagHeader4) {
         if (prev_ch_ != '\n') md_ += '\n';
@@ -345,7 +342,6 @@ class Converter {
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
         md_ += "\n##### ";
-
         chars_in_curr_line_ = 6;
       } else if (current_tag_ == kTagListItem) {
         if (prev_ch_ != '\n') md_ += '\n';
@@ -451,7 +447,7 @@ class Converter {
       md_ += ch;
       ++chars_in_curr_line_;
 
-      if (chars_in_curr_line_ > 120 && ch == ' ') {
+      if (chars_in_curr_line_ > 80 && ch == ' ') {
         // TODO(kay): find offset of previous ' ' and insert newline there
         md_ += "\n";
         chars_in_curr_line_ = 0;
