@@ -35,6 +35,8 @@ class Converter {
 
     ReplaceAll(&md, " , ", ", ");
     ReplaceAll(&md, "\n.\n", ".\n");
+    ReplaceAll(&md, "\n↵\n", " ↵\n");
+    ReplaceAll(&md, "\n*\n", "\n");
     ReplaceAll(&md, "\n. ", ".\n");
     ReplaceAll(&md, "### ", "###");
 
@@ -45,6 +47,7 @@ class Converter {
     ReplaceAll(&html, "\t", " ");
     ReplaceAll(&html, "&amp;", "&");
     ReplaceAll(&html, "&nbsp;", " ");
+    ReplaceAll(&html, "&rarr;", "→");
 
     std::__1::regex exp("<!--(.*?)-->");
     html = regex_replace(html, exp, "");
@@ -60,6 +63,7 @@ class Converter {
     static constexpr const char *kTagAnchor = "a";
     static constexpr const char *kTagBold = "b";
     static constexpr const char *kTagBreak = "br";
+    static constexpr const char *kTagDiv = "div";
     static constexpr const char *kTagHeader1 = "h1";
     static constexpr const char *kTagHeader2 = "h2";
     static constexpr const char *kTagHeader3 = "h3";
@@ -284,25 +288,26 @@ class Converter {
 
         if (prev_prev_ch_!='\n') md_ += '\n';
 
-        md_ += "###";
+        md_ += "### ";
       } else if (current_tag_ == kTagHeader3) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
-        md_ += "####";
+        md_ += "#### ";
       } else if (current_tag_ == kTagHeader4) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
-        md_ += "#####";
+        md_ += "##### ";
       } else if (current_tag_ == kTagListItem) {
         if (prev_ch_ != '\n') md_ += '\n';
 
         md_ += "* ";
       } else if (current_tag_ == kTagUnorderedList
-        || current_tag_ == kTagOrderedList ) {
+        || current_tag_ == kTagOrderedList
+        || current_tag_ == kTagDiv) {
         if (prev_ch_ != '\n') md_ += '\n';
         if (prev_prev_ch_ != '\n') md_ += '\n';
 
