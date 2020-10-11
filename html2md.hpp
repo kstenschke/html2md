@@ -31,7 +31,7 @@ class Converter {
   }
 
   static std::string &CleanUpMarkdown(std::string &md) {
-    RTrimAllLines(&md);
+    TidyAllLines(&md);
 
     ReplaceAll(&md, " , ", ", ");
     ReplaceAll(&md, "\n.\n", ".\n");
@@ -79,13 +79,16 @@ class Converter {
     static constexpr const char *kTagSpan = "span";
     static constexpr const char *kTagStrong = "strong";
     static constexpr const char *kTagStyle = "style";
+    static constexpr const char *kTagTemplate = "template";
     static constexpr const char *kTagTitle = "title";
     static constexpr const char *kTagUnorderedList = "ul";
 
     bool is_in_tag_ = false;
     bool is_closing_tag_ = false;
     bool is_in_child_of_noscript_tag_ = false;
+    bool is_in_script_tag_ = false;
     bool is_in_style_tag_ = false;
+    bool is_in_template_tag_ = false;
     bool is_in_attribute_value_ = false;
 
     // relevant for <li> only, false = is in unordered list
@@ -105,6 +108,16 @@ class Converter {
 
     Converter() = default;
 
+    // Trim from start (in place)
+    static void LTrim(std::string *s) {
+      (*s).erase(
+          (*s).begin(),
+          std::find_if(
+              (*s).begin(),
+              (*s).end(),
+              std::not1(std::ptr_fun<int, int>(std::isspace))));
+    }
+
     // Trim from end (in place)
     static void RTrim(std::string *s) {
       (*s).erase(
@@ -116,13 +129,32 @@ class Converter {
           (*s).end());
     }
 
-    static void RTrimAllLines(std::string *str) {
+    // Trim from both ends (in place)
+    static void Trim(std::string *s) {
+      LTrim(s);
+      RTrim(s);
+    }
+
+    // 1. trim all lines
+    // 2. reduce consecutive newlines to maximum 3
+    static void TidyAllLines(std::string *str) {
       auto lines = Explode(*str, '\n');
       std::string res;
 
+      bool amount_empty = 0;
+
       for (auto line : lines) {
-        RTrim(&line);
-        res += line + "\n";
+        Trim(&line);
+
+        if (line.empty()) {
+          ++amount_empty;
+
+          if (amount_empty < 3) res += "\n";
+        } else {
+          amount_empty = 0;
+
+          res += line + "\n";
+        }
       }
 
       *str = res.substr(0, res.length() - 1);
@@ -314,8 +346,12 @@ class Converter {
 
       } else if (current_tag_ == kTagNoScript) {
         is_in_child_of_noscript_tag_ = true;
+      } else if (current_tag_ == kTagScript) {
+        is_in_script_tag_ = true;
       } else if (current_tag_ == kTagStyle) {
         is_in_style_tag_ = true;
+      } else if (current_tag_ == kTagTemplate) {
+        is_in_template_tag_ = true;
       }
     }
 
@@ -335,8 +371,12 @@ class Converter {
         md_ += "\n\n";
       } else if (current_tag_ == kTagNoScript) {
         is_in_child_of_noscript_tag_ = false;
+      } else if (current_tag_ == kTagScript) {
+        is_in_script_tag_ = false;
       } else if (current_tag_ == kTagStyle) {
         is_in_style_tag_ = false;
+      } else if (current_tag_ == kTagTemplate) {
+        is_in_template_tag_ = false;
       } else if (md_len_ > 0) {
         if (current_tag_ == kTagParagraph) {
           md_ += "  \n\n";
@@ -360,7 +400,9 @@ class Converter {
 
     bool ParseCharInTagContent(char ch) {
       if (is_in_child_of_noscript_tag_
+          || is_in_script_tag_
           || is_in_style_tag_
+          || is_in_template_tag_
           || current_tag_ == kTagLink
           || current_tag_ == kTagMeta
           || current_tag_ == kTagScript) return true;
