@@ -143,12 +143,72 @@ class Converter {
   // Tag: base class for tag types
   struct Tag {
     virtual void OnHasLeftOpeningTag(Converter* converter) = 0;
+    virtual void OnHasLeftClosingTag(Converter* converter) = 0;
   };
 
-// Tag types for strategy pattern
+  // Tag types
+  struct TagAnchor : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+//        md_ += '[';
+    }
+  };
+
+  struct TagBreak : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->md_len_ > 0) converter->AppendToMd("  \n");
+    }
+  };
+
+  struct TagOption : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->md_len_ > 0) converter->AppendToMd("  \n");
+    }
+  };
+
+  struct TagParagraph : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (!converter->md_.empty()) converter->AppendToMd("  \n\n");
+    }
+  };
+
+  struct TagSpan : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->prev_ch_ != ' ') converter->AppendToMd(' ');
+    }
+  };
+
+  struct TagTitle : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->TurnLineIntoHeader1();
+    }
+  };
+
+  struct TagHeader1 : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->md_len_ > 0)  converter->TurnLineIntoHeader2();
+    }
+  };
+
   struct TagHeader2 : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
       converter->AppendToMd("\n\n\n### ");
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->AppendToMd("\n\n");
     }
   };
 
@@ -156,11 +216,17 @@ class Converter {
     void OnHasLeftOpeningTag(Converter* converter) override {
       converter->AppendToMd("\n\n\n#### ");
     }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->AppendToMd("\n\n");
+    }
   };
 
   struct TagHeader4 : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
       converter->AppendToMd("\n\n\n##### ");
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->AppendToMd("\n\n");
     }
   };
 
@@ -170,6 +236,9 @@ class Converter {
 
       converter->AppendToMd("* ");
     }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->md_len_ > 0) converter->AppendToMd("  \n");
+    }
   };
 
   struct TagUnorderedList : Tag {
@@ -177,6 +246,8 @@ class Converter {
       if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
 
       if (converter->prev_prev_ch_ != '\n') converter->AppendToMd("\n");
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
     }
   };
 
@@ -186,11 +257,18 @@ class Converter {
 
       if (converter->prev_prev_ch_ != '\n') converter->AppendToMd("\n");
     }
+    void OnHasLeftClosingTag(Converter* converter) override {
+    }
   };
 
   struct TagBold : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
       if (converter->prev_ch_ != ' ') converter->AppendToMd(' ');
+
+      converter->AppendToMd("**");
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->prev_ch_ == ' ') converter->ShortenMarkdown();
 
       converter->AppendToMd("**");
     }
@@ -202,18 +280,67 @@ class Converter {
 
       if (converter->prev_prev_ch_ != '\n') converter->AppendToMd('\n');
     }
+    void OnHasLeftClosingTag(Converter* converter) override {
+    }
+  };
+
+  struct TagNoScript : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->is_in_child_of_noscript_tag_ = true;
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->is_in_child_of_noscript_tag_ = false;
+    }
+  };
+
+  struct TagScript : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->is_in_script_tag_ = true;
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->is_in_script_tag_ = false;
+    }
+  };
+
+  struct TagTemplate : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->is_in_template_tag_ = true;
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->is_in_template_tag_ = false;
+    }
+  };
+
+  struct TagStyle : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->is_in_style_tag_ = true;
+    }
+    void OnHasLeftClosingTag(Converter* converter) override {
+      converter->is_in_style_tag_ = false;
+    }
   };
 
   std::map<std::string, Tag*> tags_;
 
   Converter() {
+    tags_[kTagAnchor] = new TagAnchor();
+    tags_[kTagBreak] = new TagBreak();
+    tags_[kTagDiv] = new TagDiv();
+    tags_[kTagHeader1] = new TagHeader1();
     tags_[kTagHeader2] = new TagHeader2();
     tags_[kTagHeader3] = new TagHeader3();
     tags_[kTagHeader4] = new TagHeader4();
     tags_[kTagListItem] = new TagListItem();
-    tags_[kTagUnorderedList] = new TagUnorderedList();
+    tags_[kTagNoScript] = new TagNoScript();
+    tags_[kTagOption] = new TagOption();
     tags_[kTagOrderedList] = new TagOrderedList();
-    tags_[kTagDiv] = new TagDiv();
+    tags_[kTagParagraph] = new TagParagraph();
+    tags_[kTagScript] = new TagScript();
+    tags_[kTagSpan] = new TagSpan();
+    tags_[kTagTemplate] = new TagTemplate();
+    tags_[kTagTitle] = new TagTitle();
+    tags_[kTagUnorderedList] = new TagUnorderedList();
+    tags_[kTagStyle] = new TagStyle();
 
     auto *bold = new TagBold();
     tags_[kTagBold] = bold;
@@ -318,16 +445,16 @@ class Converter {
     return out;
   }
 
-  void TurnLineIntoHeader1(std::string *md, u_int16_t *chars_in_line) {
-    *md += "\n" + Repeat("=", *chars_in_line) + "\n\n";
+  void TurnLineIntoHeader1() {
+    md_ += "\n" + Repeat("=", chars_in_curr_line_) + "\n\n";
 
-    *chars_in_line = 0;
+    chars_in_curr_line_ = 0;
   }
 
-  void TurnLineIntoHeader2(std::string *md, u_int16_t *chars_in_line) {
-    *md += "\n" + Repeat("-", *chars_in_line) + "\n\n";
+  void TurnLineIntoHeader2() {
+    md_ += "\n" + Repeat("-", chars_in_curr_line_) + "\n\n";
 
-    *chars_in_line = 0;
+    chars_in_curr_line_ = 0;
   }
 
   Converter *Convert2Md(const std::string html) {
@@ -417,72 +544,18 @@ class Converter {
     current_tag_ = Explode(current_tag_, ' ')[0];
     prev_ch_ = md_[md_len_ - 1];
 
-    if (is_closing_tag_)
-      OnHasLeftClosingTag();
-    else
-      OnHasLeftOpeningTag();
-
-    return true;
-  }
-
-  // '>' = has left opening-tag
-  void OnHasLeftOpeningTag() {
     Tag* tag = tags_[current_tag_];
 
-    if (tag != nullptr) tag->OnHasLeftOpeningTag(this);
-
-    // TODO(kay): forward declare Converter and pass it into factory tag
-    // TODO(kay): than add tag types for the following
-    if (current_tag_ == kTagNoScript) {
-      is_in_child_of_noscript_tag_ = true;
-    } else if (current_tag_ == kTagScript) {
-      is_in_script_tag_ = true;
-    } else if (current_tag_ == kTagStyle) {
-      is_in_style_tag_ = true;
-    } else if (current_tag_ == kTagTemplate) {
-      is_in_template_tag_ = true;
-    }
-  }
-
-  void OnHasLeftClosingTag() {
-    // '>' = has left closing-tag
-    is_closing_tag_ = false;
-
-    // TODO(kay): replace  multifold conditions by factory / strategy pattern
-
-    if (current_tag_ == kTagAnchor) {
-//        md_ += '[';
-    } else if (current_tag_ == kTagBold || current_tag_ == kTagStrong) {
-      if (prev_ch_ == ' ') ShortenMarkdown();
-
-      AppendToMd("**");
-    } else if (current_tag_ == kTagHeader2
-        || current_tag_ == kTagHeader3
-        || current_tag_ == kTagHeader4) {
-      AppendToMd("\n\n");
-    } else if (current_tag_ == kTagNoScript) {
-      is_in_child_of_noscript_tag_ = false;
-    } else if (current_tag_ == kTagScript) {
-      is_in_script_tag_ = false;
-    } else if (current_tag_ == kTagStyle) {
-      is_in_style_tag_ = false;
-    } else if (current_tag_ == kTagTemplate) {
-      is_in_template_tag_ = false;
-    } else if (md_len_ > 0) {
-      if (current_tag_ == kTagParagraph) {
-        AppendToMd("  \n\n");
-      } else if (current_tag_ == kTagBreak
-          || current_tag_ == kTagOption
-          || current_tag_ == kTagListItem) {
-        AppendToMd("  \n");
-      } else if (current_tag_ == kTagSpan) {
-        if (prev_ch_ != ' ') md_ += " ";
-      } else if (current_tag_ == kTagTitle) {
-        TurnLineIntoHeader1(&md_, &chars_in_curr_line_);
-      } else if (current_tag_ == kTagHeader1) {
-        TurnLineIntoHeader2(&md_, &chars_in_curr_line_);
+    if (tag != nullptr) {
+      if (is_closing_tag_) {
+        is_closing_tag_ = false;
+        tag->OnHasLeftClosingTag(this);
+      } else {
+        tag->OnHasLeftOpeningTag(this);
       }
     }
+
+    return true;
   }
 
   void ShortenMarkdown(int chars = 1) {
