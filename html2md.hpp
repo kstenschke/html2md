@@ -14,126 +14,6 @@
 
 namespace html2md {
 
-// Tag: base class for tag types
-struct Tag {
-  virtual u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) = 0;
-
-  u_int16_t AppendToMd(std::string *md, char ch, u_int16_t chars_in_curr_line) {
-    *md += ch;
-
-    if (ch == '\n')
-      chars_in_curr_line = 0;
-    else
-      ++chars_in_curr_line;
-
-    return chars_in_curr_line;
-  }
-
-  u_int16_t AppendToMd(
-      std::string *md, const char *str, u_int16_t chars_in_curr_line) {
-    *md += str;
-
-    auto str_len = strlen(str);
-
-    for (int i = 0; i < str_len; ++i) {
-      if (str[i] == '\n')
-        chars_in_curr_line = 0;
-      else
-        ++chars_in_curr_line;
-    }
-
-    return chars_in_curr_line;
-  }
-};
-
-// Tag types for strategy pattern
-struct TagHeader2 : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    return AppendToMd(md, "\n\n\n### ", chars_in_current_line);
-  }
-};
-
-struct TagHeader3 : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    return AppendToMd(md, "\n\n\n#### ", chars_in_current_line);
-  }
-};
-
-struct TagHeader4 : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    return AppendToMd(md, "\n\n\n##### ", chars_in_current_line);
-  }
-};
-
-struct TagListItem : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    char prev_ch = (*md)[md->length() - 1];
-
-    if (prev_ch != '\n') AppendToMd(md, "\n", chars_in_current_line);
-
-    return AppendToMd(md, "* ", chars_in_current_line);;
-  }
-};
-
-struct TagUnorderedList : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    char prev_ch = (*md)[md->length() - 1];
-    char prev_prev_ch = (*md)[md->length() - 2];
-
-    if (prev_ch != '\n') AppendToMd(md, "\n", chars_in_current_line);
-
-    if (prev_prev_ch != '\n') AppendToMd(md, "\n", chars_in_current_line);
-
-    return 0;
-  }
-};
-
-struct TagOrderedList : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    char prev_ch = (*md)[md->length() - 1];
-    char prev_prev_ch = (*md)[md->length() - 2];
-
-    if (prev_ch != '\n') AppendToMd(md, "\n", chars_in_current_line);
-
-    if (prev_prev_ch != '\n') AppendToMd(md, "\n", chars_in_current_line);
-
-    return 0;
-  }
-};
-
-struct TagBold : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    char prev_ch = (*md)[md->length() - 1];
-
-    if (prev_ch != ' ')
-      chars_in_current_line = AppendToMd(md, ' ', chars_in_current_line);
-
-    return AppendToMd(md, "**", chars_in_current_line);
-  }
-};
-
-struct TagDiv : Tag {
-  u_int16_t OnHasLeftOpeningTag(
-      std::string *md, u_int16_t chars_in_current_line) override {
-    char prev_ch = (*md)[md->length() - 1];
-    char prev_prev_ch = (*md)[md->length() - 2];
-
-    if (prev_ch != '\n') AppendToMd(md, '\n', chars_in_current_line);
-
-    if (prev_prev_ch != '\n') AppendToMd(md, '\n', chars_in_current_line);
-
-    return 0;
-  }
-};
-
 // Main class: HTML to Markdown converter
 class Converter {
  public:
@@ -260,6 +140,70 @@ class Converter {
   std::string md_;
   size_t md_len_;
 
+  // Tag: base class for tag types
+  struct Tag {
+    virtual void OnHasLeftOpeningTag(Converter* converter) = 0;
+  };
+
+// Tag types for strategy pattern
+  struct TagHeader2 : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->AppendToMd("\n\n\n### ");
+    }
+  };
+
+  struct TagHeader3 : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->AppendToMd("\n\n\n#### ");
+    }
+  };
+
+  struct TagHeader4 : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->AppendToMd("\n\n\n##### ");
+    }
+  };
+
+  struct TagListItem : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
+
+      converter->AppendToMd("* ");
+    }
+  };
+
+  struct TagUnorderedList : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
+
+      if (converter->prev_prev_ch_ != '\n') converter->AppendToMd("\n");
+    }
+  };
+
+  struct TagOrderedList : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
+
+      if (converter->prev_prev_ch_ != '\n') converter->AppendToMd("\n");
+    }
+  };
+
+  struct TagBold : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      if (converter->prev_ch_ != ' ') converter->AppendToMd(' ');
+
+      converter->AppendToMd("**");
+    }
+  };
+
+  struct TagDiv : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      if (converter->prev_ch_ != '\n') converter->AppendToMd('\n');
+
+      if (converter->prev_prev_ch_ != '\n') converter->AppendToMd('\n');
+    }
+  };
+
   std::map<std::string, Tag*> tags_;
 
   Converter() {
@@ -271,7 +215,7 @@ class Converter {
     tags_[kTagOrderedList] = new TagOrderedList();
     tags_[kTagDiv] = new TagDiv();
 
-    TagBold *bold = new TagBold();
+    auto *bold = new TagBold();
     tags_[kTagBold] = bold;
     tags_[kTagStrong] = bold;
   }
@@ -485,8 +429,7 @@ class Converter {
   void OnHasLeftOpeningTag() {
     Tag* tag = tags_[current_tag_];
 
-    if (tag != nullptr)
-      chars_in_curr_line_ = tag->OnHasLeftOpeningTag(&md_, chars_in_curr_line_);
+    if (tag != nullptr) tag->OnHasLeftOpeningTag(this);
 
     // TODO(kay): forward declare Converter and pass it into factory tag
     // TODO(kay): than add tag types for the following
