@@ -120,7 +120,8 @@ class Converter {
   bool is_in_ordered_list_ = true;
   int index_li;
 
-  char prev_ch_, prev_prev_ch_;
+  char prev_ch_in_md_, prev_prev_ch_in_md_;
+  char prev_ch_in_html_ = 'x';
 
   std::string current_tag_;
   std::string prev_tag_;
@@ -144,7 +145,7 @@ class Converter {
       converter->AppendToMd("[");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
-      if (converter->prev_ch_ == ' ') converter->ShortenMarkdown();
+      if (converter->prev_ch_in_md_ == ' ') converter->ShortenMarkdown();
 
       converter->AppendToMd("]");
     }
@@ -152,12 +153,12 @@ class Converter {
 
   struct TagBold : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      if (converter->prev_ch_ != ' ') converter->AppendToMd(' ');
+      if (converter->prev_ch_in_md_ != ' ') converter->AppendToMd(' ');
 
       converter->AppendToMd("**");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
-      if (converter->prev_ch_ == ' ') converter->ShortenMarkdown();
+      if (converter->prev_ch_in_md_ == ' ') converter->ShortenMarkdown();
 
       converter->AppendToMd("**");
     }
@@ -173,9 +174,9 @@ class Converter {
 
   struct TagDiv : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      if (converter->prev_ch_ != '\n') converter->AppendToMd('\n');
+      if (converter->prev_ch_in_md_ != '\n') converter->AppendToMd('\n');
 
-      if (converter->prev_prev_ch_ != '\n') converter->AppendToMd('\n');
+      if (converter->prev_prev_ch_in_md_ != '\n') converter->AppendToMd('\n');
     }
     void OnHasLeftClosingTag(Converter* converter) override {
     }
@@ -218,7 +219,7 @@ class Converter {
 
   struct TagListItem : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
+      if (converter->prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
 
       converter->AppendToMd("* ");
     }
@@ -246,9 +247,9 @@ class Converter {
 
   struct TagOrderedList : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
+      if (converter->prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
 
-      if (converter->prev_prev_ch_ != '\n') converter->AppendToMd("\n");
+      if (converter->prev_prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
     }
@@ -275,7 +276,7 @@ class Converter {
     void OnHasLeftOpeningTag(Converter* converter) override {
     }
     void OnHasLeftClosingTag(Converter* converter) override {
-      if (converter->prev_ch_ != ' ') converter->AppendToMd(' ');
+      if (converter->prev_ch_in_md_ != ' ') converter->AppendToMd(' ');
     }
   };
 
@@ -307,9 +308,9 @@ class Converter {
 
   struct TagUnorderedList : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      if (converter->prev_ch_ != '\n') converter->AppendToMd("\n");
+      if (converter->prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
 
-      if (converter->prev_prev_ch_ != '\n') converter->AppendToMd("\n");
+      if (converter->prev_prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
     }
@@ -479,9 +480,9 @@ class Converter {
     current_tag_ = "";
 
     if (!md_.empty()) {
-      prev_ch_ = md_[md_.length() - 1];
+      prev_ch_in_md_ = md_[md_.length() - 1];
 
-      if (prev_ch_ != ' ' && prev_ch_ != '\n')
+      if (prev_ch_in_md_ != ' ' && prev_ch_in_md_ != '\n')
         md_ += ' ';
     }
   }
@@ -513,7 +514,7 @@ class Converter {
         is_in_attribute_value_ = false;
         current_attribute_ = "";
         current_attribute_value_ = "";
-      } else if (prev_ch_ == '=') {
+      } else if (prev_ch_in_md_ == '=') {
         is_in_attribute_value_ = true;
       }
 
@@ -537,7 +538,7 @@ class Converter {
 
     md_len_ = md_.length();
     current_tag_ = Explode(current_tag_, ' ')[0];
-    prev_ch_ = md_[md_len_ - 1];
+    prev_ch_in_md_ = md_[md_len_ - 1];
 
     Tag* tag = tags_[current_tag_];
 
@@ -558,28 +559,38 @@ class Converter {
   }
 
   bool ParseCharInTagContent(char ch) {
+    if (ch == '\n') return true;
+
     if (is_in_child_of_noscript_tag_
         || is_in_script_tag_
         || is_in_style_tag_
         || is_in_template_tag_
         || current_tag_ == kTagLink
         || current_tag_ == kTagMeta
-        || current_tag_ == kTagScript
-        || ch == '\n')
-      return true;
+        || current_tag_ == kTagScript) {
+      prev_ch_in_html_ = ch;
 
-    prev_ch_ = md_len_ > 0 ? md_[md_len_ - 1] : '.';
-    prev_prev_ch_ = md_len_ > 1 ? md_[md_len_ - 2] : '.';
+      return true;
+    }
+
+    prev_ch_in_md_ = md_len_ > 0
+                     ? md_[md_len_ - 1]
+                     : '.';
+
+    prev_prev_ch_in_md_ = md_len_ > 1
+                          ? md_[md_len_ - 2]
+                          : '.';
 
     // prevent more than one consecutive spaces
+    // TODO(kay): prevent space as 1st char within tag content
     if (ch == ' ') {
       if (md_len_ == 0
-          || prev_ch_ == ' '
-          || prev_ch_ == '\n')
+          || prev_ch_in_md_ == ' '
+          || prev_ch_in_md_ == '\n')
         return true;
     }
 
-    if (ch == '.' && prev_ch_ == ' ') {
+    if (ch == '.' && prev_ch_in_md_ == ' ') {
       ShortenMarkdown();
       --chars_in_curr_line_;
     }
