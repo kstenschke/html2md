@@ -18,8 +18,7 @@ namespace html2md {
 // Main class: HTML to Markdown converter
 class Converter {
  public:
-  ~Converter() {
-  }
+  ~Converter() = default;
 
   static std::string Convert(std::string *html) {
     auto *instance = new Converter(html);
@@ -93,6 +92,18 @@ class Converter {
     }
 
     return this;
+  }
+
+  // Append ' ' if:
+  // - md does not end w/ '**'
+  // - md does not end w/ '\n'
+  Converter* AppendBlank() {
+    UpdatePrevChFromMd();
+
+    if (prev_ch_in_md_ == '\n'
+        || (prev_ch_in_md_ == '*' && prev_prev_ch_in_md_ == '*')) return this;
+
+    return AppendToMd(' ');
   }
 
  private:
@@ -179,7 +190,8 @@ class Converter {
 
       converter->current_href_ =
           converter->RTrim(&converter->md_, true)
-                   ->AppendToMd(" [")
+                   ->AppendBlank()
+                   ->AppendToMd("[")
                    ->ExtractAttributeFromTagLeftOf(kAttributeHref);
     }
 
@@ -600,7 +612,12 @@ class Converter {
   }
 
   Converter * UpdatePrevChFromMd() {
-    if (!md_.empty()) prev_ch_in_md_ = md_[md_.length() - 1];
+    if (!md_.empty()) {
+      prev_ch_in_md_ = md_[md_.length() - 1];
+
+      if (md_.length() > 1)
+        prev_prev_ch_in_md_ = md_[md_.length() - 2];
+    }
 
     return this;
   }
