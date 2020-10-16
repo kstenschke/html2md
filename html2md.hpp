@@ -150,7 +150,7 @@ class Converter {
 
   std::string current_href_;
 
-  u_int16_t chars_in_curr_line_ = 0;
+  size_t chars_in_curr_line_ = 0;
   u_int16_t char_index_in_tag_content = 0;
 
   std::string md_;
@@ -735,10 +735,37 @@ class Converter {
     ++chars_in_curr_line_;
     ++char_index_in_tag_content;
 
-    if (chars_in_curr_line_ > 80 && ch == ' ') {
-      md_ += "\n";
-      chars_in_curr_line_ = 0;
+    if (chars_in_curr_line_ > 80) {
+      if (ch == ' ') {
+        md_ += "\n";
+        chars_in_curr_line_ = 0;
+      } else if (chars_in_curr_line_ > 100) {
+        ReplacePreviousSpaceInLineByNewline();
+      }
     }
+
+    return false;
+  }
+
+  // Replace previous space (if any) in current markdown line by newline
+  bool ReplacePreviousSpaceInLineByNewline() {
+    int offset_space = std::string::npos;
+
+    UpdateMdLen();
+    auto offset = md_len_ - 1;
+
+    do {
+      if (md_[offset] == '\n') return false;
+
+      if (md_[offset] == ' ') {
+        md_[offset] = '\n';
+        chars_in_curr_line_ = md_len_ - offset;
+
+        return true;
+      }
+
+      --offset;
+    } while (offset > 0);
 
     return false;
   }
