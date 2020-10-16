@@ -24,20 +24,18 @@ class Converter {
   static std::string Convert(std::string *html) {
     auto *instance = new Converter(html);
 
-    PrepareHtml(html);
+    auto md = instance->PrepareHtml(html)
+                      ->Convert2Md(*html)
+                      ->GetMd_();
 
-    auto md = instance
-        ->Convert2Md(*html)
-        ->GetMd_();
+    instance->CleanUpMarkdown(&md);
 
     delete instance;
-
-    CleanUpMarkdown(&md);
 
     return md;
   }
 
-  static void PrepareHtml(std::string *html) {
+  Converter * PrepareHtml(std::string *html) {
     ReplaceAll(html, "\t", " ");
     ReplaceAll(html, "&amp;", "&");
     ReplaceAll(html, "&nbsp;", " ");
@@ -45,9 +43,11 @@ class Converter {
 
     std::regex exp("<!--(.*?)-->");
     *html = regex_replace(*html, exp, "");
+
+    return this;
   }
 
-  static void CleanUpMarkdown(std::string *md) {
+  void CleanUpMarkdown(std::string *md) {
     TidyAllLines(md);
 
     ReplaceAll(md, " , ", ", ");
@@ -102,6 +102,7 @@ class Converter {
   static constexpr const char *kTagBold = "b";
   static constexpr const char *kTagBreak = "br";
   static constexpr const char *kTagDiv = "div";
+  static constexpr const char *kTagHead = "head";
   static constexpr const char *kTagHeader1 = "h1";
   static constexpr const char *kTagHeader2 = "h2";
   static constexpr const char *kTagHeader3 = "h3";
@@ -177,29 +178,24 @@ class Converter {
       if (converter->IsInIgnoredTag()) return;
 
       converter->current_href_ =
-          converter
-              ->AppendToMd('[')
-              ->ExtractAttributeFromTagLeftOf(kAttributeHref);
+          converter->RTrim(&converter->md_, true)
+                   ->AppendToMd(" [")
+                   ->ExtractAttributeFromTagLeftOf(kAttributeHref);
     }
 
     void OnHasLeftClosingTag(Converter* converter) override {
       if (converter->IsInIgnoredTag()) return;
 
       if (converter->prev_ch_in_md_ == ' ') {
-        converter
-            ->ShortenMarkdown()
-            ->UpdatePrevChFromMd();
+        converter->ShortenMarkdown();
       }
 
       if (converter->prev_ch_in_md_ == '[') {
-        converter
-            ->ShortenMarkdown()
-            ->UpdatePrevChFromMd();
+        converter->ShortenMarkdown();
       } else {
-        converter
-            ->AppendToMd("](")
-            ->AppendToMd(converter->current_href_.c_str())
-            ->AppendToMd(")");
+        converter->AppendToMd("](")
+                 ->AppendToMd(converter->current_href_.c_str())
+                 ->AppendToMd(") ");
       }
     }
   };
@@ -355,6 +351,7 @@ class Converter {
 
     // non-printing tags
     auto *tagIgnored = new TagIgnored();
+    tags_[kTagHead] = tagIgnored;
     tags_[kTagMeta] = tagIgnored;
     tags_[kTagNav] = tagIgnored;
     tags_[kTagNoScript] = tagIgnored;
@@ -395,25 +392,32 @@ class Converter {
   }
 
   // Trim from end (in place)
-  static void RTrim(std::string *s) {
+  Converter * RTrim(std::string *s, bool trim_only_blank = false) {
     (*s).erase(
         std::find_if(
             (*s).rbegin(),
             (*s).rend(),
-            std::not1(std::ptr_fun<int, int>(std::isspace)))
+            trim_only_blank
+              ? std::not1(std::ptr_fun<int, int>(std::isblank))
+              : std::not1(std::ptr_fun<int, int>(std::isspace))
+        )
             .base(),
         (*s).end());
+
+    return this;
   }
 
   // Trim from both ends (in place)
-  static void Trim(std::string *s) {
+  Converter * Trim(std::string *s) {
     LTrim(s);
     RTrim(s);
+
+    return this;
   }
 
   // 1. trim all lines
   // 2. reduce consecutive newlines to maximum 3
-  static void TidyAllLines(std::string *str) {
+  void TidyAllLines(std::string *str) {
     auto lines = Explode(*str, '\n');
     std::string res;
 
@@ -595,8 +599,10 @@ class Converter {
     }
   }
 
-  void UpdatePrevChFromMd() {
+  Converter * UpdatePrevChFromMd() {
     if (!md_.empty()) prev_ch_in_md_ = md_[md_.length() - 1];
+
+    return this;
   }
 
   /**
@@ -680,7 +686,7 @@ class Converter {
 
     md_ = md_.substr(0, md_len_ - chars);
 
-    return this;
+    return this->UpdatePrevChFromMd();
   }
 
   bool ParseCharInTagContent(char ch) {
@@ -728,13 +734,14 @@ class Converter {
     return false;
   }
 
-  bool IsIgnoredTag(std::string tag) {
+  bool IsIgnoredTag(const std::string &tag) {
     return (kTagTemplate == tag
         || kTagStyle == tag
         || kTagScript == tag
         || kTagNoScript == tag
-        || kTagMeta == tag
         || kTagNav == tag);
+
+    // meta: not ignored to tolerate if closing is omitted
   }
 
   bool IsInIgnoredTag() {
@@ -742,6 +749,9 @@ class Converter {
 
     for (int i = 0; i < len; ++i) {
       std::string tag = dom_tags_[i];
+
+      if (kTagPre == tag
+          || kTagTitle == tag) return false;
 
       if (IsIgnoredTag(tag)) return true;
     }
