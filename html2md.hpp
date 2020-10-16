@@ -7,6 +7,7 @@
 #include <functional>
 #include <regex>  // NOLINT [build/c++11]
 #include <sstream>
+#include <stack>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,7 +22,7 @@ class Converter {
   }
 
   static std::string Convert(std::string *html) {
-    auto *instance = new Converter();
+    auto *instance = new Converter(html);
 
     PrepareHtml(html);
 
@@ -36,16 +37,6 @@ class Converter {
     return md;
   }
 
-  static void CleanUpMarkdown(std::string *md) {
-    TidyAllLines(md);
-
-    ReplaceAll(md, " , ", ", ");
-    ReplaceAll(md, "\n.\n", ".\n");
-    ReplaceAll(md, "\n↵\n", " ↵\n");
-    ReplaceAll(md, "\n*\n", "\n");
-    ReplaceAll(md, "\n. ", ".\n");
-  }
-
   static void PrepareHtml(std::string *html) {
     ReplaceAll(html, "\t", " ");
     ReplaceAll(html, "&amp;", "&");
@@ -53,24 +44,43 @@ class Converter {
     ReplaceAll(html, "&rarr;", "→");
 
     std::regex exp("<!--(.*?)-->");
-
     *html = regex_replace(*html, exp, "");
+  }
+
+  static void CleanUpMarkdown(std::string *md) {
+    TidyAllLines(md);
+
+    ReplaceAll(md, " , ", ", ");
+
+    ReplaceAll(md, "\n.\n", ".\n");
+    ReplaceAll(md, "\n↵\n", " ↵\n");
+    ReplaceAll(md, "\n*\n", "\n");
+    ReplaceAll(md, "\n. ", ".\n");
+
+    ReplaceAll(md, " [ ", " [");
+    ReplaceAll(md, "\n[ ", "\n[");
   }
 
   const std::string &GetMd_() const {
     return md_;
   }
 
-  void AppendToMd(char ch) {
+  Converter* AppendToMd(char ch) {
+    if (IsInIgnoredTag()) return this;
+
     md_ += ch;
 
     if (ch == '\n')
       chars_in_curr_line_ = 0;
     else
       ++chars_in_curr_line_;
+
+    return this;
   }
 
-  void AppendToMd(const char *str) {
+  Converter* AppendToMd(const char *str) {
+    if (IsInIgnoredTag()) return this;
+
     md_ += str;
 
     auto str_len = strlen(str);
@@ -81,9 +91,13 @@ class Converter {
       else
         ++chars_in_curr_line_;
     }
+
+    return this;
   }
 
  private:
+  static constexpr const char *kAttributeHref = "href";
+
   static constexpr const char *kTagAnchor = "a";
   static constexpr const char *kTagBold = "b";
   static constexpr const char *kTagBreak = "br";
@@ -95,10 +109,12 @@ class Converter {
   static constexpr const char *kTagLink = "link";
   static constexpr const char *kTagListItem = "li";
   static constexpr const char *kTagMeta = "meta";
+  static constexpr const char *kTagNav = "nav";
   static constexpr const char *kTagNoScript = "noscript";
   static constexpr const char *kTagOption = "option";
   static constexpr const char *kTagOrderedList = "ol";
   static constexpr const char *kTagParagraph = "p";
+  static constexpr const char *kTagPre = "pre";
   static constexpr const char *kTagScript = "script";
   static constexpr const char *kTagSpan = "span";
   static constexpr const char *kTagStrong = "strong";
@@ -107,13 +123,13 @@ class Converter {
   static constexpr const char *kTagTitle = "title";
   static constexpr const char *kTagUnorderedList = "ul";
 
+  u_int16_t index_ch_in_html_ = 0;
+
+  std::vector<std::string> dom_tags_;
+
   bool is_in_tag_ = false;
   bool is_closing_tag_ = false;
-  bool is_in_child_of_noscript_tag_ = false;
-  bool is_in_script_tag_ = false;
-  bool is_in_style_tag_ = false;
-  bool is_in_svg_tag_ = false;
-  bool is_in_template_tag_ = false;
+
   bool is_in_attribute_value_ = false;
 
   // relevant for <li> only, false = is in unordered list
@@ -123,12 +139,19 @@ class Converter {
   char prev_ch_in_md_, prev_prev_ch_in_md_;
   char prev_ch_in_html_ = 'x';
 
+  std::string html_;
+
+  u_int16_t offset_lt_;
   std::string current_tag_;
   std::string prev_tag_;
+
   std::string current_attribute_;
   std::string current_attribute_value_;
 
+  std::string current_href_;
+
   u_int16_t chars_in_curr_line_ = 0;
+  u_int16_t char_index_in_tag_content = 0;
 
   std::string md_;
   size_t md_len_;
@@ -140,14 +163,44 @@ class Converter {
   };
 
   // Tag types
-  struct TagAnchor : Tag {
+
+  // tags that are not printed (nav, script, noscript, ...)
+  struct TagIgnored : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      converter->AppendToMd("[");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
-      if (converter->prev_ch_in_md_ == ' ') converter->ShortenMarkdown();
+    }
+  };
 
-      converter->AppendToMd("]");
+  struct TagAnchor : Tag {
+    void OnHasLeftOpeningTag(Converter* converter) override {
+      if (converter->IsInIgnoredTag()) return;
+
+      converter->current_href_ =
+          converter
+              ->AppendToMd('[')
+              ->ExtractAttributeFromTagLeftOf(kAttributeHref);
+    }
+
+    void OnHasLeftClosingTag(Converter* converter) override {
+      if (converter->IsInIgnoredTag()) return;
+
+      if (converter->prev_ch_in_md_ == ' ') {
+        converter
+            ->ShortenMarkdown()
+            ->UpdatePrevChFromMd();
+      }
+
+      if (converter->prev_ch_in_md_ == '[') {
+        converter
+            ->ShortenMarkdown()
+            ->UpdatePrevChFromMd();
+      } else {
+        converter
+            ->AppendToMd("](")
+            ->AppendToMd(converter->current_href_.c_str())
+            ->AppendToMd(")");
+      }
     }
   };
 
@@ -228,15 +281,6 @@ class Converter {
     }
   };
 
-  struct TagNoScript : Tag {
-    void OnHasLeftOpeningTag(Converter* converter) override {
-      converter->is_in_child_of_noscript_tag_ = true;
-    }
-    void OnHasLeftClosingTag(Converter* converter) override {
-      converter->is_in_child_of_noscript_tag_ = false;
-    }
-  };
-
   struct TagOption : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
     }
@@ -263,12 +307,16 @@ class Converter {
     }
   };
 
-  struct TagScript : Tag {
+  struct TagPre : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      converter->is_in_script_tag_ = true;
+      if (converter->prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
+
+      if (converter->prev_prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
+
+      converter->AppendToMd("````\n");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
-      converter->is_in_script_tag_ = false;
+      converter->AppendToMd("\n````\n\n");
     }
   };
 
@@ -276,25 +324,9 @@ class Converter {
     void OnHasLeftOpeningTag(Converter* converter) override {
     }
     void OnHasLeftClosingTag(Converter* converter) override {
-      if (converter->prev_ch_in_md_ != ' ') converter->AppendToMd(' ');
-    }
-  };
-
-  struct TagStyle : Tag {
-    void OnHasLeftOpeningTag(Converter* converter) override {
-      converter->is_in_style_tag_ = true;
-    }
-    void OnHasLeftClosingTag(Converter* converter) override {
-      converter->is_in_style_tag_ = false;
-    }
-  };
-
-  struct TagTemplate : Tag {
-    void OnHasLeftOpeningTag(Converter* converter) override {
-      converter->is_in_template_tag_ = true;
-    }
-    void OnHasLeftClosingTag(Converter* converter) override {
-      converter->is_in_template_tag_ = false;
+      if (converter->prev_ch_in_md_ != ' '
+          && converter->char_index_in_tag_content > 0)
+        converter->AppendToMd(' ');
     }
   };
 
@@ -318,7 +350,19 @@ class Converter {
 
   std::map<std::string, Tag*> tags_;
 
-  Converter() {
+  Converter(std::string *html) {
+    html_ = *html;
+
+    // non-printing tags
+    auto *tagIgnored = new TagIgnored();
+    tags_[kTagMeta] = tagIgnored;
+    tags_[kTagNav] = tagIgnored;
+    tags_[kTagNoScript] = tagIgnored;
+    tags_[kTagScript] = tagIgnored;
+    tags_[kTagStyle] = tagIgnored;
+    tags_[kTagTemplate] = tagIgnored;
+
+    // printing tags
     tags_[kTagAnchor] = new TagAnchor();
     tags_[kTagBreak] = new TagBreak();
     tags_[kTagDiv] = new TagDiv();
@@ -327,16 +371,13 @@ class Converter {
     tags_[kTagHeader3] = new TagHeader3();
     tags_[kTagHeader4] = new TagHeader4();
     tags_[kTagListItem] = new TagListItem();
-    tags_[kTagNoScript] = new TagNoScript();
     tags_[kTagOption] = new TagOption();
     tags_[kTagOrderedList] = new TagOrderedList();
+    tags_[kTagPre] = new TagPre();
     tags_[kTagParagraph] = new TagParagraph();
-    tags_[kTagScript] = new TagScript();
     tags_[kTagSpan] = new TagSpan();
-    tags_[kTagTemplate] = new TagTemplate();
     tags_[kTagTitle] = new TagTitle();
     tags_[kTagUnorderedList] = new TagUnorderedList();
-    tags_[kTagStyle] = new TagStyle();
 
     auto *bold = new TagBold();
     tags_[kTagBold] = bold;
@@ -441,6 +482,66 @@ class Converter {
     return out;
   }
 
+  std::string ExtractAttributeFromTagLeftOf(std::string attr) {
+    char ch = ' ';
+
+    // Extract the whole tag from current offset, e.g. from '>', backwards
+    auto tag = html_.substr(offset_lt_, index_ch_in_html_ - offset_lt_);
+
+    // locate given attribute
+    auto offset_attr = tag.find(attr);
+    
+    if (offset_attr == std::string::npos) return "";
+
+    // locate attribute-value pair's '='
+    auto offset_equals = tag.find('=', offset_attr);
+
+    if (offset_equals == std::string::npos) return "";
+
+    // locate value's surrounding quotes
+    auto offset_double_quote = tag.find('"', offset_equals);
+    auto offset_single_quote = tag.find('\'', offset_equals);
+
+    bool has_double_quote = offset_double_quote != std::string::npos;
+    bool has_single_quote = offset_single_quote != std::string::npos;
+
+    if (!has_double_quote && !has_single_quote) return "";
+
+    char wrapping_quote;
+
+    u_int64_t offset_opening_quote;
+    u_int64_t offset_closing_quote;
+
+    if (has_double_quote) {
+      if (!has_single_quote) {
+        wrapping_quote = '"';
+        offset_opening_quote = offset_double_quote;
+      } else {
+        if (offset_double_quote < offset_single_quote) {
+          wrapping_quote = '"';
+          offset_opening_quote = offset_double_quote;
+        } else {
+          wrapping_quote = '\'';
+          offset_opening_quote = offset_single_quote;
+        }
+      }
+    } else {
+      // has only single quote
+      wrapping_quote = '\'';
+      offset_opening_quote = offset_single_quote;
+    }
+
+    if (offset_opening_quote == std::string::npos) return "";
+
+    offset_closing_quote = tag.find(wrapping_quote, offset_opening_quote + 1);
+
+    if (offset_closing_quote == std::string::npos) return "";
+
+    return tag.substr(
+        offset_opening_quote + 1,
+        offset_closing_quote - 1 - offset_opening_quote);
+  }
+
   void TurnLineIntoHeader1() {
     md_ += "\n" + Repeat("=", chars_in_curr_line_) + "\n\n";
 
@@ -453,28 +554,35 @@ class Converter {
     chars_in_curr_line_ = 0;
   }
 
+  // Main character iteration of parser
   Converter *Convert2Md(const std::string html) {
     for (char ch : html) {
-      if (!is_in_tag_ && ch == '<') {
+      if (!is_in_tag_
+          && ch == '<') {
         OnHasEnteredTag();
 
         continue;
       }
 
-      md_len_ = md_.length();
+      UpdateMdLen();
 
       if ((is_in_tag_ && ParseCharInTag(ch))
           || (!is_in_tag_ && ParseCharInTagContent(ch)))
         continue;
 
 //        if (md_len_ > 4000) break;
+
+      ++index_ch_in_html_;
     }
 
     return this;
   }
 
+  void UpdateMdLen() { md_len_ = md_.length(); }
+
   // Current char: '<'
   void OnHasEnteredTag() {
+    offset_lt_ = index_ch_in_html_;
     is_in_tag_ = true;
     prev_tag_ = current_tag_;
     current_tag_ = "";
@@ -485,6 +593,10 @@ class Converter {
       if (prev_ch_in_md_ != ' ' && prev_ch_in_md_ != '\n')
         md_ += ' ';
     }
+  }
+
+  void UpdatePrevChFromMd() {
+    if (!md_.empty()) prev_ch_in_md_ = md_[md_.length() - 1];
   }
 
   /**
@@ -536,17 +648,26 @@ class Converter {
   bool OnHasLeftTag() {
     is_in_tag_ = false;
 
-    md_len_ = md_.length();
+    UpdateMdLen();
+
     current_tag_ = Explode(current_tag_, ' ')[0];
+
     prev_ch_in_md_ = md_[md_len_ - 1];
+
+    char_index_in_tag_content = 0;
 
     Tag* tag = tags_[current_tag_];
 
     if (tag != nullptr) {
       if (is_closing_tag_) {
         is_closing_tag_ = false;
+
         tag->OnHasLeftClosingTag(this);
+
+        if (!dom_tags_.empty()) dom_tags_.pop_back();
       } else {
+        dom_tags_.push_back(current_tag_);
+
         tag->OnHasLeftOpeningTag(this);
       }
     }
@@ -554,20 +675,19 @@ class Converter {
     return true;
   }
 
-  void ShortenMarkdown(int chars = 1) {
+  Converter* ShortenMarkdown(int chars = 1) {
+    UpdateMdLen();
+
     md_ = md_.substr(0, md_len_ - chars);
+
+    return this;
   }
 
   bool ParseCharInTagContent(char ch) {
     if (ch == '\n') return true;
 
-    if (is_in_child_of_noscript_tag_
-        || is_in_script_tag_
-        || is_in_style_tag_
-        || is_in_template_tag_
-        || current_tag_ == kTagLink
-        || current_tag_ == kTagMeta
-        || current_tag_ == kTagScript) {
+    if (IsInIgnoredTag()
+        || current_tag_ == kTagLink) {
       prev_ch_in_html_ = ch;
 
       return true;
@@ -582,9 +702,9 @@ class Converter {
                           : '.';
 
     // prevent more than one consecutive spaces
-    // TODO(kay): prevent space as 1st char within tag content
     if (ch == ' ') {
       if (md_len_ == 0
+          || char_index_in_tag_content == 0
           || prev_ch_in_md_ == ' '
           || prev_ch_in_md_ == '\n')
         return true;
@@ -596,11 +716,34 @@ class Converter {
     }
 
     md_ += ch;
+
     ++chars_in_curr_line_;
+    ++char_index_in_tag_content;
 
     if (chars_in_curr_line_ > 80 && ch == ' ') {
       md_ += "\n";
       chars_in_curr_line_ = 0;
+    }
+
+    return false;
+  }
+
+  bool IsIgnoredTag(std::string tag) {
+    return (kTagTemplate == tag
+        || kTagStyle == tag
+        || kTagScript == tag
+        || kTagNoScript == tag
+        || kTagMeta == tag
+        || kTagNav == tag);
+  }
+
+  bool IsInIgnoredTag() {
+    auto len = dom_tags_.size();
+
+    for (int i = 0; i < len; ++i) {
+      std::string tag = dom_tags_[i];
+
+      if (IsIgnoredTag(tag)) return true;
     }
 
     return false;
