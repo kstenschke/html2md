@@ -346,7 +346,7 @@ class Converter {
 
   std::map<std::string, Tag*> tags_;
 
-  Converter(std::string *html) {
+  explicit Converter(std::string *html) {
     html_ = *html;
 
     // non-printing tags
@@ -494,7 +494,7 @@ class Converter {
 
     // locate given attribute
     auto offset_attr = tag.find(attr);
-    
+
     if (offset_attr == std::string::npos) return "";
 
     // locate attribute-value pair's '='
