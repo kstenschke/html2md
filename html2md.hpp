@@ -22,46 +22,34 @@ class Converter {
 
   static std::string Convert(std::string *html) {
     auto *instance = new Converter(html);
-
-    auto md = instance->PrepareHtml(html)
-                      ->Convert2Md(*html)
-                      ->GetMd_();
-
-    instance->CleanUpMarkdown(&md);
-
+    auto md = instance->Convert2Md();
     delete instance;
 
     return md;
   }
 
-  Converter * PrepareHtml(std::string *html) {
-    ReplaceAll(html, "\t", " ");
-    ReplaceAll(html, "&amp;", "&");
-    ReplaceAll(html, "&nbsp;", " ");
-    ReplaceAll(html, "&rarr;", "→");
+  void PrepareHtml() {
+    ReplaceAll(&html_, "\t", " ");
+    ReplaceAll(&html_, "&amp;", "&");
+    ReplaceAll(&html_, "&nbsp;", " ");
+    ReplaceAll(&html_, "&rarr;", "→");
 
     std::regex exp("<!--(.*?)-->");
-    *html = regex_replace(*html, exp, "");
-
-    return this;
+    html_ = regex_replace(html_, exp, "");
   }
 
-  void CleanUpMarkdown(std::string *md) {
-    TidyAllLines(md);
+  void CleanUpMarkdown() {
+    TidyAllLines(&md_);
 
-    ReplaceAll(md, " , ", ", ");
+    ReplaceAll(&md_, " , ", ", ");
 
-    ReplaceAll(md, "\n.\n", ".\n");
-    ReplaceAll(md, "\n↵\n", " ↵\n");
-    ReplaceAll(md, "\n*\n", "\n");
-    ReplaceAll(md, "\n. ", ".\n");
+    ReplaceAll(&md_, "\n.\n", ".\n");
+    ReplaceAll(&md_, "\n↵\n", " ↵\n");
+    ReplaceAll(&md_, "\n*\n", "\n");
+    ReplaceAll(&md_, "\n. ", ".\n");
 
-    ReplaceAll(md, " [ ", " [");
-    ReplaceAll(md, "\n[ ", "\n[");
-  }
-
-  const std::string &GetMd_() const {
-    return md_;
+    ReplaceAll(&md_, " [ ", " [");
+    ReplaceAll(&md_, "\n[ ", "\n[");
   }
 
   Converter* AppendToMd(char ch) {
@@ -214,7 +202,7 @@ class Converter {
 
   struct TagBold : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
-      if (converter->prev_ch_in_md_ != ' ') converter->AppendToMd(' ');
+      if (converter->prev_ch_in_md_ != ' ') converter->AppendBlank();
 
       converter->AppendToMd("**");
     }
@@ -334,7 +322,7 @@ class Converter {
     void OnHasLeftClosingTag(Converter* converter) override {
       if (converter->prev_ch_in_md_ != ' '
           && converter->char_index_in_tag_content > 0)
-        converter->AppendToMd(' ');
+        converter->AppendBlank();
     }
   };
 
@@ -360,6 +348,8 @@ class Converter {
 
   explicit Converter(std::string *html) {
     html_ = *html;
+
+    PrepareHtml();
 
     // non-printing tags
     auto *tagIgnored = new TagIgnored();
@@ -571,8 +561,8 @@ class Converter {
   }
 
   // Main character iteration of parser
-  Converter *Convert2Md(const std::string html) {
-    for (char ch : html) {
+  std::string Convert2Md() {
+    for (char ch : html_) {
       if (!is_in_tag_
           && ch == '<') {
         OnHasEnteredTag();
@@ -591,7 +581,9 @@ class Converter {
       ++index_ch_in_html_;
     }
 
-    return this;
+    CleanUpMarkdown();
+
+    return md_;
   }
 
   void UpdateMdLen() { md_len_ = md_.length(); }
