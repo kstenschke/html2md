@@ -129,8 +129,8 @@ class Converter {
 
   bool is_in_tag_ = false;
   bool is_closing_tag_ = false;
-
   bool is_in_attribute_value_ = false;
+  bool is_within_pre_ = false;
 
   // relevant for <li> only, false = is in unordered list
   bool is_in_ordered_list_ = true;
@@ -305,6 +305,8 @@ class Converter {
 
   struct TagPre : Tag {
     void OnHasLeftOpeningTag(Converter* converter) override {
+      converter->is_within_pre_ = true;
+
       if (converter->prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
 
       if (converter->prev_prev_ch_in_md_ != '\n') converter->AppendToMd("\n");
@@ -312,6 +314,8 @@ class Converter {
       converter->AppendToMd("````\n");
     }
     void OnHasLeftClosingTag(Converter* converter) override {
+      converter->is_within_pre_ = false;
+
       converter->AppendToMd("\n````\n\n");
     }
   };
@@ -478,7 +482,7 @@ class Converter {
   }
 
   // Repeat given amount of given string
-  static std::string Repeat(const std::string &str, u_int16_t amount) {
+  static std::string Repeat(const std::string &str, size_t amount) {
     std::string out;
 
     for (u_int16_t i = 0; i < amount; i++) {
@@ -596,7 +600,7 @@ class Converter {
     current_tag_ = "";
 
     if (!md_.empty()) {
-      prev_ch_in_md_ = md_[md_.length() - 1];
+      UpdatePrevChFromMd();
 
       if (prev_ch_in_md_ != ' ' && prev_ch_in_md_ != '\n')
         md_ += ' ';
@@ -664,10 +668,13 @@ class Converter {
     is_in_tag_ = false;
 
     UpdateMdLen();
+    UpdatePrevChFromMd();
+
+    bool is_hidden = is_closing_tag_
+                     ? false
+                     : TagContainsAttributesToHide(&current_tag_);
 
     current_tag_ = Explode(current_tag_, ' ')[0];
-
-    prev_ch_in_md_ = md_[md_len_ - 1];
 
     char_index_in_tag_content = 0;
 
@@ -679,15 +686,32 @@ class Converter {
 
         tag->OnHasLeftClosingTag(this);
 
-        if (!dom_tags_.empty()) dom_tags_.pop_back();
+        if (!dom_tags_.empty()) {
+          if (dom_tags_[dom_tags_.size() - 1] == kTagPre)
+            is_within_pre_ = false;
+
+          dom_tags_.pop_back();
+        }
       } else {
-        dom_tags_.push_back(current_tag_);
+        auto breadcrump_tag = current_tag_;
+
+        if (is_hidden) breadcrump_tag = "-" + current_tag_;
+
+        dom_tags_.push_back(breadcrump_tag);
 
         tag->OnHasLeftOpeningTag(this);
       }
     }
 
     return true;
+  }
+
+  bool TagContainsAttributesToHide(std::string *tag) {
+    return (*tag).find(" aria=\"hidden\"") != std::string::npos
+        || (*tag).find("display:none") != std::string::npos
+        || (*tag).find("visibility:hidden") != std::string::npos
+        || (*tag).find("opacity:0") != std::string::npos
+        || (*tag).find("Details-content--hidden-not-important") != std::string::npos;
   }
 
   Converter* ShortenMarkdown(int chars = 1) {
@@ -698,7 +722,22 @@ class Converter {
     return this->UpdatePrevChFromMd();
   }
 
+  /**
+   * @param ch
+   * @return continue iteration surrounding  this method's invocation?
+   */
   bool ParseCharInTagContent(char ch) {
+    if (is_within_pre_) {
+      md_ += ch;
+
+      ++chars_in_curr_line_;
+      ++char_index_in_tag_content;
+
+      UpdatePrevChFromMd();
+
+      return false;
+    }
+
     if (ch == '\n') return true;
 
     if (IsInIgnoredTag()
@@ -708,13 +747,7 @@ class Converter {
       return true;
     }
 
-    prev_ch_in_md_ = md_len_ > 0
-                     ? md_[md_len_ - 1]
-                     : '.';
-
-    prev_prev_ch_in_md_ = md_len_ > 1
-                          ? md_[md_len_ - 2]
-                          : '.';
+    UpdatePrevChFromMd();
 
     // prevent more than one consecutive spaces
     if (ch == ' ') {
@@ -749,8 +782,6 @@ class Converter {
 
   // Replace previous space (if any) in current markdown line by newline
   bool ReplacePreviousSpaceInLineByNewline() {
-    int offset_space = std::string::npos;
-
     UpdateMdLen();
     auto offset = md_len_ - 1;
 
@@ -771,7 +802,8 @@ class Converter {
   }
 
   bool IsIgnoredTag(const std::string &tag) {
-    return (kTagTemplate == tag
+    return (tag[0] == '-'
+        || kTagTemplate == tag
         || kTagStyle == tag
         || kTagScript == tag
         || kTagNoScript == tag
