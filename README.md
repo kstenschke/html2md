@@ -15,7 +15,7 @@ html2md
 
 ## What does it do?
 
-html2md is rudimentary solution for HTML to Markdown conversion, implemented as a C++ single header.  
+html2md is a rudimentary solution for HTML to Markdown conversion, implemented as a C++ single header.  
 
 Also the project is a good example for efficient abstraction of logical decision trees via strategy pattern.
 
