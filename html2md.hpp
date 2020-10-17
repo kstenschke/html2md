@@ -209,7 +209,7 @@ class Converter {
     void OnHasLeftClosingTag(Converter* converter) override {
       if (converter->prev_ch_in_md_ == ' ') converter->ShortenMarkdown();
 
-      converter->AppendToMd("**");
+      converter->AppendToMd("** ");
     }
   };
 
@@ -711,7 +711,8 @@ class Converter {
         || (*tag).find("display:none") != std::string::npos
         || (*tag).find("visibility:hidden") != std::string::npos
         || (*tag).find("opacity:0") != std::string::npos
-        || (*tag).find("Details-content--hidden-not-important") != std::string::npos;
+        || (*tag).find("Details-content--hidden-not-important")
+            != std::string::npos;
   }
 
   Converter* ShortenMarkdown(int chars = 1) {
